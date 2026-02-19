@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "lucide-react";
+import { ErrorAlert } from "@/components/ErrorAlert";
 
 export function ClustersPage() {
   const { data: clusters, isLoading, error } = useQuery({
@@ -11,7 +12,7 @@ export function ClustersPage() {
     queryFn: api.clusters.list,
   });
   if (isLoading) return <div className="text-muted-foreground">Loading clusters...</div>;
-  if (error) return <div className="text-destructive">Error: {(error as Error).message}</div>;
+  if (error) return <ErrorAlert message={(error as Error).message} />;
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Clusters</h2>

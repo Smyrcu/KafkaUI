@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ErrorAlert } from "@/components/ErrorAlert";
 
 export function BrokersPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
@@ -12,7 +13,7 @@ export function BrokersPage() {
     enabled: !!clusterName,
   });
   if (isLoading) return <div className="text-muted-foreground">Loading brokers...</div>;
-  if (error) return <div className="text-destructive">Error: {(error as Error).message}</div>;
+  if (error) return <ErrorAlert message={(error as Error).message} />;
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Brokers</h2>
