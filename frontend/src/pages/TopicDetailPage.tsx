@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ErrorAlert } from "@/components/ErrorAlert";
 
 export function TopicDetailPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
@@ -13,7 +14,7 @@ export function TopicDetailPage() {
     enabled: !!clusterName && !!topicName,
   });
   if (isLoading) return <div className="text-muted-foreground">Loading topic details...</div>;
-  if (error) return <div className="text-destructive">Error: {(error as Error).message}</div>;
+  if (error) return <ErrorAlert message={(error as Error).message} />;
   if (!topic) return null;
   return (
     <div className="space-y-6">

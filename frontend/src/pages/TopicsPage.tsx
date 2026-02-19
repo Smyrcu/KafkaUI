@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
+import { ErrorAlert } from "@/components/ErrorAlert";
 
 export function TopicsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
@@ -39,7 +40,7 @@ export function TopicsPage() {
 
   const filteredTopics = topics?.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()));
   if (isLoading) return <div className="text-muted-foreground">Loading topics...</div>;
-  if (error) return <div className="text-destructive">Error: {(error as Error).message}</div>;
+  if (error) return <ErrorAlert message={(error as Error).message} />;
 
   return (
     <div>
