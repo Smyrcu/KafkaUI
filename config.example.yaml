@@ -1,0 +1,10 @@
+server:
+  port: 8080
+  base-path: ""
+
+auth:
+  enabled: false
+
+clusters:
+  - name: local
+    bootstrap-servers: localhost:9092
