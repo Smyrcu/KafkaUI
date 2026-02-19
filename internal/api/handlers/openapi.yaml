@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: KafkaUI API
+  description: REST API for managing Apache Kafka clusters
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+paths:
+  /clusters:
+    get:
+      summary: List clusters
+      description: Returns all configured Kafka clusters
+      operationId: listClusters
+      tags: [Clusters]
+      responses:
+        "200":
+          description: List of clusters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClusterInfo"
+
+  /clusters/{clusterName}/brokers:
+    get:
+      summary: List brokers
+      description: Returns all brokers for a given cluster
+      operationId: listBrokers
+      tags: [Brokers]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+      responses:
+        "200":
+          description: List of brokers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BrokerInfo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /clusters/{clusterName}/topics:
+    get:
+      summary: List topics
+      description: Returns all topics for a given cluster
+      operationId: listTopics
+      tags: [Topics]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+      responses:
+        "200":
+          description: List of topics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TopicInfo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      summary: Create topic
+      description: Creates a new topic in the cluster
+      operationId: createTopic
+      tags: [Topics]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTopicRequest"
+      responses:
+        "201":
+          description: Topic created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /clusters/{clusterName}/topics/{topicName}:
+    get:
+      summary: Get topic details
+      description: Returns detailed information about a specific topic
+      operationId: getTopicDetails
+      tags: [Topics]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/TopicName"
+      responses:
+        "200":
+          description: Topic details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopicDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      summary: Delete topic
+      description: Deletes a topic from the cluster
+      operationId: deleteTopic
+      tags: [Topics]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/TopicName"
+      responses:
+        "200":
+          description: Topic deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    ClusterName:
+      name: clusterName
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Name of the Kafka cluster
+    TopicName:
+      name: topicName
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Name of the topic
+
+  schemas:
+    ClusterInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: local
+        bootstrapServers:
+          type: string
+          example: "localhost:9092"
+
+    BrokerInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 0
+        host:
+          type: string
+          example: localhost
+        port:
+          type: integer
+          example: 9092
+        rack:
+          type: string
+          example: ""
+
+    TopicInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: my-topic
+        partitions:
+          type: integer
+          example: 3
+        replicas:
+          type: integer
+          example: 1
+        internal:
+          type: boolean
+          example: false
+
+    TopicDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        internal:
+          type: boolean
+        partitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PartitionInfo"
+        configs:
+          type: object
+          additionalProperties:
+            type: string
+
+    PartitionInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+        leader:
+          type: integer
+        replicas:
+          type: array
+          items:
+            type: integer
+        isr:
+          type: array
+          items:
+            type: integer
+
+    CreateTopicRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: my-new-topic
+        partitions:
+          type: integer
+          minimum: 1
+          default: 1
+        replicas:
+          type: integer
+          minimum: 1
+          default: 1
+
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        topic:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
