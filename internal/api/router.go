@@ -32,6 +32,9 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger) http.Handler {
 	topicHandler := handlers.NewTopicHandler(registry)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/docs", handlers.SwaggerUI)
+		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)
+
 		r.Get("/clusters", clusterHandler.List)
 
 		r.Route("/clusters/{clusterName}", func(r chi.Router) {
