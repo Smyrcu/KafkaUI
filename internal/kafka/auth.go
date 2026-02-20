@@ -13,7 +13,7 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
-func buildSASLOpt(cfg config.SASLConfig) (kgo.Opt, error) {
+func BuildSASLOpt(cfg config.SASLConfig) (kgo.Opt, error) {
 	switch cfg.Mechanism {
 	case "PLAIN":
 		return kgo.SASL(plain.Auth{
@@ -35,7 +35,7 @@ func buildSASLOpt(cfg config.SASLConfig) (kgo.Opt, error) {
 	}
 }
 
-func buildTLSOpt(cfg config.TLSConfig) (kgo.Opt, error) {
+func BuildTLSOpt(cfg config.TLSConfig) (kgo.Opt, error) {
 	tlsCfg := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}

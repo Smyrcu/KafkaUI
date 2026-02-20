@@ -10,6 +10,7 @@ import (
 
 	"github.com/Smyrcu/KafkaUI/internal/api/handlers"
 	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
+	"github.com/Smyrcu/KafkaUI/internal/api/ws"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
 
@@ -30,6 +31,8 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger) http.Handler {
 	clusterHandler := handlers.NewClusterHandler(registry)
 	brokerHandler := handlers.NewBrokerHandler(registry)
 	topicHandler := handlers.NewTopicHandler(registry)
+	messageHandler := handlers.NewMessageHandler(registry)
+	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
@@ -44,7 +47,14 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger) http.Handler {
 			r.Post("/topics", topicHandler.Create)
 			r.Get("/topics/{topicName}", topicHandler.Details)
 			r.Delete("/topics/{topicName}", topicHandler.Delete)
+
+			r.Get("/topics/{topicName}/messages", messageHandler.Browse)
+			r.Post("/topics/{topicName}/messages", messageHandler.Produce)
 		})
+	})
+
+	r.Route("/ws", func(r chi.Router) {
+		r.Get("/clusters/{clusterName}/topics/{topicName}/live", liveTailHandler.Handle)
 	})
 
 	return r

@@ -58,7 +58,7 @@ func main() {
 		Addr:         addr,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0, // disabled for WebSocket support
 		IdleTimeout:  60 * time.Second,
 	}
 

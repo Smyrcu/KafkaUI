@@ -33,7 +33,7 @@ func TestBuildSASLOpt_SupportedMechanisms(t *testing.T) {
 				Username:  "user",
 				Password:  "pass",
 			}
-			opt, err := buildSASLOpt(cfg)
+			opt, err := BuildSASLOpt(cfg)
 			if err != nil {
 				t.Fatalf("unexpected error for %s: %v", m, err)
 			}
@@ -48,7 +48,7 @@ func TestBuildSASLOpt_UnsupportedMechanism(t *testing.T) {
 	cfg := config.SASLConfig{
 		Mechanism: "UNSUPPORTED",
 	}
-	_, err := buildSASLOpt(cfg)
+	_, err := BuildSASLOpt(cfg)
 	if err == nil {
 		t.Fatal("expected error for unsupported mechanism")
 	}
