@@ -6,6 +6,7 @@ import { ClustersPage } from "@/pages/ClustersPage";
 import { BrokersPage } from "@/pages/BrokersPage";
 import { TopicsPage } from "@/pages/TopicsPage";
 import { TopicDetailPage } from "@/pages/TopicDetailPage";
+import { TopicMessagesPage } from "@/pages/TopicMessagesPage";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 
 const queryClient = new QueryClient({
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/clusters/:clusterName/brokers" element={<BrokersPage />} />
               <Route path="/clusters/:clusterName/topics" element={<TopicsPage />} />
               <Route path="/clusters/:clusterName/topics/:topicName" element={<TopicDetailPage />} />
+              <Route path="/clusters/:clusterName/topics/:topicName/messages" element={<TopicMessagesPage />} />
               <Route path="/clusters/:clusterName/consumer-groups" element={<PlaceholderPage title="Consumer Groups" />} />
               <Route path="/clusters/:clusterName/schemas" element={<PlaceholderPage title="Schema Registry" />} />
               <Route path="/clusters/:clusterName/connect" element={<PlaceholderPage title="Kafka Connect" />} />

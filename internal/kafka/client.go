@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -12,9 +13,10 @@ import (
 )
 
 type Client struct {
-	raw   *kgo.Client
-	admin *kadm.Client
-	name  string
+	raw    *kgo.Client
+	admin  *kadm.Client
+	name   string
+	config config.ClusterConfig
 }
 
 type BrokerInfo struct {
@@ -52,6 +54,29 @@ type CreateTopicRequest struct {
 	Replicas   int16  `json:"replicas"`
 }
 
+type MessageRecord struct {
+	Partition int32             `json:"partition"`
+	Offset    int64             `json:"offset"`
+	Timestamp time.Time         `json:"timestamp"`
+	Key       string            `json:"key"`
+	Value     string            `json:"value"`
+	Headers   map[string]string `json:"headers,omitempty"`
+}
+
+type ConsumeRequest struct {
+	Partition *int32     // nil = all partitions
+	Offset    int64      // -1 = latest, -2 = earliest
+	Timestamp *time.Time // if set, overrides Offset
+	Limit     int
+}
+
+type ProduceRequest struct {
+	Key       string            `json:"key"`
+	Value     string            `json:"value"`
+	Partition *int32            `json:"partition,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
+}
+
 func NewClient(cfg config.ClusterConfig) (*Client, error) {
 	seeds := strings.Split(cfg.BootstrapServers, ",")
 	opts := []kgo.Opt{
@@ -59,7 +84,7 @@ func NewClient(cfg config.ClusterConfig) (*Client, error) {
 	}
 
 	if cfg.SASL.Mechanism != "" {
-		saslOpt, err := buildSASLOpt(cfg.SASL)
+		saslOpt, err := BuildSASLOpt(cfg.SASL)
 		if err != nil {
 			return nil, fmt.Errorf("configuring SASL: %w", err)
 		}
@@ -67,7 +92,7 @@ func NewClient(cfg config.ClusterConfig) (*Client, error) {
 	}
 
 	if cfg.TLS.Enabled {
-		tlsOpt, err := buildTLSOpt(cfg.TLS)
+		tlsOpt, err := BuildTLSOpt(cfg.TLS)
 		if err != nil {
 			return nil, fmt.Errorf("configuring TLS: %w", err)
 		}
@@ -80,9 +105,10 @@ func NewClient(cfg config.ClusterConfig) (*Client, error) {
 	}
 
 	return &Client{
-		raw:   raw,
-		admin: kadm.NewClient(raw),
-		name:  cfg.Name,
+		raw:    raw,
+		admin:  kadm.NewClient(raw),
+		name:   cfg.Name,
+		config: cfg,
 	}, nil
 }
 
@@ -203,4 +229,169 @@ func (c *Client) DeleteTopic(ctx context.Context, name string) error {
 		}
 	}
 	return nil
+}
+
+func (c *Client) Config() config.ClusterConfig {
+	return c.config
+}
+
+func (c *Client) newConsumerOpts() ([]kgo.Opt, error) {
+	seeds := strings.Split(c.config.BootstrapServers, ",")
+	opts := []kgo.Opt{
+		kgo.SeedBrokers(seeds...),
+	}
+	if c.config.SASL.Mechanism != "" {
+		saslOpt, err := BuildSASLOpt(c.config.SASL)
+		if err != nil {
+			return nil, fmt.Errorf("configuring SASL for consumer: %w", err)
+		}
+		opts = append(opts, saslOpt)
+	}
+	if c.config.TLS.Enabled {
+		tlsOpt, err := BuildTLSOpt(c.config.TLS)
+		if err != nil {
+			return nil, fmt.Errorf("configuring TLS for consumer: %w", err)
+		}
+		opts = append(opts, tlsOpt)
+	}
+	return opts, nil
+}
+
+func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeRequest) ([]MessageRecord, error) {
+	if req.Limit <= 0 {
+		req.Limit = 100
+	}
+	if req.Limit > 500 {
+		req.Limit = 500
+	}
+
+	topics, err := c.admin.ListTopics(ctx, topic)
+	if err != nil {
+		return nil, fmt.Errorf("listing topic: %w", err)
+	}
+	t, ok := topics[topic]
+	if !ok {
+		return nil, fmt.Errorf("topic %q not found", topic)
+	}
+
+	topicOffsets := make(map[int32]kgo.Offset)
+	for _, p := range t.Partitions.Sorted() {
+		if req.Partition != nil && p.Partition != *req.Partition {
+			continue
+		}
+		switch req.Offset {
+		case -1:
+			topicOffsets[p.Partition] = kgo.NewOffset().AtEnd()
+		case -2:
+			topicOffsets[p.Partition] = kgo.NewOffset().AtStart()
+		default:
+			topicOffsets[p.Partition] = kgo.NewOffset().At(req.Offset)
+		}
+	}
+
+	if req.Timestamp != nil {
+		ts := req.Timestamp.UnixMilli()
+		listedOffsets, err := c.admin.ListOffsetsAfterMilli(ctx, ts, topic)
+		if err != nil {
+			return nil, fmt.Errorf("listing offsets for timestamp: %w", err)
+		}
+		topicOffsets = make(map[int32]kgo.Offset)
+		listedOffsets.Each(func(lo kadm.ListedOffset) {
+			if req.Partition != nil && lo.Partition != *req.Partition {
+				return
+			}
+			topicOffsets[lo.Partition] = kgo.NewOffset().At(lo.Offset)
+		})
+	}
+
+	if len(topicOffsets) == 0 {
+		return []MessageRecord{}, nil
+	}
+
+	offsets := map[string]map[int32]kgo.Offset{topic: topicOffsets}
+
+	opts, err := c.newConsumerOpts()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, kgo.ConsumePartitions(offsets))
+
+	consumer, err := kgo.NewClient(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating consumer: %w", err)
+	}
+	defer consumer.Close()
+
+	var records []MessageRecord
+	for len(records) < req.Limit {
+		fetches := consumer.PollFetches(ctx)
+		if ctx.Err() != nil {
+			break
+		}
+		if errs := fetches.Errors(); len(errs) > 0 {
+			if ctx.Err() != nil {
+				break
+			}
+			return records, fmt.Errorf("consuming: %v", errs[0].Err)
+		}
+		fetches.EachRecord(func(r *kgo.Record) {
+			if len(records) >= req.Limit {
+				return
+			}
+			headers := make(map[string]string)
+			for _, h := range r.Headers {
+				headers[h.Key] = string(h.Value)
+			}
+			records = append(records, MessageRecord{
+				Partition: r.Partition,
+				Offset:    r.Offset,
+				Timestamp: r.Timestamp,
+				Key:       string(r.Key),
+				Value:     string(r.Value),
+				Headers:   headers,
+			})
+		})
+	}
+
+	return records, nil
+}
+
+func (c *Client) ProduceMessage(ctx context.Context, topic string, req ProduceRequest) (*MessageRecord, error) {
+	r := &kgo.Record{
+		Topic: topic,
+		Key:   []byte(req.Key),
+		Value: []byte(req.Value),
+	}
+	if req.Partition != nil {
+		r.Partition = *req.Partition
+	} else {
+		r.Partition = -1
+	}
+	for k, v := range req.Headers {
+		r.Headers = append(r.Headers, kgo.RecordHeader{Key: k, Value: []byte(v)})
+	}
+
+	var produceErr error
+	c.raw.Produce(ctx, r, func(r *kgo.Record, err error) {
+		produceErr = err
+	})
+	if err := c.raw.Flush(ctx); err != nil {
+		return nil, fmt.Errorf("flushing produce: %w", err)
+	}
+	if produceErr != nil {
+		return nil, fmt.Errorf("producing message: %w", produceErr)
+	}
+
+	headers := make(map[string]string)
+	for _, h := range r.Headers {
+		headers[h.Key] = string(h.Value)
+	}
+	return &MessageRecord{
+		Partition: r.Partition,
+		Offset:    r.Offset,
+		Timestamp: r.Timestamp,
+		Key:       string(r.Key),
+		Value:     string(r.Value),
+		Headers:   headers,
+	}, nil
 }

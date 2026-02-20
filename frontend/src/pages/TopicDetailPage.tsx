@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { TopicTabs } from "@/components/TopicTabs";
 
 export function TopicDetailPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
@@ -22,6 +23,7 @@ export function TopicDetailPage() {
         <h2 className="text-2xl font-bold">{topic.name}</h2>
         {topic.internal && <Badge variant="secondary">internal</Badge>}
       </div>
+      <TopicTabs />
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Partitions</CardTitle></CardHeader>

@@ -134,6 +134,83 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /clusters/{clusterName}/topics/{topicName}/messages:
+    get:
+      summary: Browse messages
+      description: Consume messages from a topic with offset/timestamp filtering
+      operationId: browseMessages
+      tags: [Messages]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/TopicName"
+        - name: partition
+          in: query
+          schema:
+            type: integer
+          description: Partition to consume from (all if omitted)
+        - name: offset
+          in: query
+          schema:
+            type: string
+            default: "earliest"
+          description: "Offset to start from: 'earliest', 'latest', or a number"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+          description: Maximum number of messages to return
+        - name: timestamp
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Seek to this timestamp (RFC3339, overrides offset)
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      summary: Produce message
+      description: Produce a message to a topic
+      operationId: produceMessage
+      tags: [Messages]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/TopicName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProduceRequest"
+      responses:
+        "200":
+          description: Message produced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 components:
   parameters:
     ClusterName:
@@ -249,6 +326,41 @@ components:
           type: string
         topic:
           type: string
+
+    MessageRecord:
+      type: object
+      properties:
+        partition:
+          type: integer
+        offset:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        key:
+          type: string
+        value:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+
+    ProduceRequest:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        partition:
+          type: integer
+          nullable: true
+        headers:
+          type: object
+          additionalProperties:
+            type: string
 
     ErrorResponse:
       type: object

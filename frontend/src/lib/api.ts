@@ -19,6 +19,29 @@ export interface TopicDetail { name: string; partitions: PartitionInfo[]; config
 export interface PartitionInfo { id: number; leader: number; replicas: number[]; isr: number[]; }
 export interface CreateTopicRequest { name: string; partitions: number; replicas: number; }
 
+export interface MessageRecord {
+  partition: number;
+  offset: number;
+  timestamp: string;
+  key: string;
+  value: string;
+  headers?: Record<string, string>;
+}
+
+export interface ProduceRequest {
+  key: string;
+  value: string;
+  partition?: number | null;
+  headers?: Record<string, string>;
+}
+
+export interface BrowseParams {
+  partition?: number;
+  offset?: string;
+  limit?: number;
+  timestamp?: string;
+}
+
 export const api = {
   clusters: { list: () => request<ClusterInfo[]>('/clusters') },
   brokers: { list: (cluster: string) => request<BrokerInfo[]>(`/clusters/${cluster}/brokers`) },
@@ -27,5 +50,18 @@ export const api = {
     details: (cluster: string, topic: string) => request<TopicDetail>(`/clusters/${cluster}/topics/${topic}`),
     create: (cluster: string, data: CreateTopicRequest) => request(`/clusters/${cluster}/topics`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (cluster: string, topic: string) => request(`/clusters/${cluster}/topics/${topic}`, { method: 'DELETE' }),
+  },
+  messages: {
+    browse: (cluster: string, topic: string, params?: BrowseParams) => {
+      const searchParams = new URLSearchParams();
+      if (params?.partition !== undefined) searchParams.set('partition', String(params.partition));
+      if (params?.offset) searchParams.set('offset', params.offset);
+      if (params?.limit) searchParams.set('limit', String(params.limit));
+      if (params?.timestamp) searchParams.set('timestamp', params.timestamp);
+      const qs = searchParams.toString();
+      return request<MessageRecord[]>(`/clusters/${cluster}/topics/${topic}/messages${qs ? `?${qs}` : ''}`);
+    },
+    produce: (cluster: string, topic: string, data: ProduceRequest) =>
+      request<MessageRecord>(`/clusters/${cluster}/topics/${topic}/messages`, { method: 'POST', body: JSON.stringify(data) }),
   },
 };
