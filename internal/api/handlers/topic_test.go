@@ -64,3 +64,76 @@ func TestTopicHandler_Create_MissingName(t *testing.T) {
 		t.Fatalf("expected status 400, got %d", rec.Code)
 	}
 }
+
+func TestTopicHandler_List_ValidCluster(t *testing.T) {
+	reg := mustCreateRegistry(t)
+	h := NewTopicHandler(reg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("clusterName", "alpha")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.List(rec, req)
+
+	// 500 = Kafka unreachable (not 404)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rec.Code)
+	}
+}
+
+func TestTopicHandler_Details_ClusterNotFound(t *testing.T) {
+	reg := mustCreateRegistry(t)
+	h := NewTopicHandler(reg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/topics/test", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("clusterName", "nonexistent")
+	rctx.URLParams.Add("topicName", "test")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Details(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestTopicHandler_Delete_ClusterNotFound(t *testing.T) {
+	reg := mustCreateRegistry(t)
+	h := NewTopicHandler(reg)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/nonexistent/topics/test", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("clusterName", "nonexistent")
+	rctx.URLParams.Add("topicName", "test")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Delete(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}
+
+func TestTopicHandler_Create_ClusterNotFound(t *testing.T) {
+	reg := mustCreateRegistry(t)
+	h := NewTopicHandler(reg)
+
+	payload := map[string]any{"name": "test", "partitions": 1, "replicas": 1}
+	bodyBytes, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/nonexistent/topics", bytes.NewBuffer(bodyBytes))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("clusterName", "nonexistent")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	rec := httptest.NewRecorder()
+	h.Create(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.Code)
+	}
+}

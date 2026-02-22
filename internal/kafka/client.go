@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -75,6 +76,47 @@ type ProduceRequest struct {
 	Value     string            `json:"value"`
 	Partition *int32            `json:"partition,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
+}
+
+type ConsumerGroupInfo struct {
+	Name          string `json:"name"`
+	State         string `json:"state"`
+	Members       int    `json:"members"`
+	TopicCount    int    `json:"topics"`
+	CoordinatorID int32  `json:"coordinatorId"`
+}
+
+type ConsumerGroupDetail struct {
+	Name          string                     `json:"name"`
+	State         string                     `json:"state"`
+	CoordinatorID int32                      `json:"coordinatorId"`
+	Members       []ConsumerGroupMember      `json:"members"`
+	Offsets       []ConsumerGroupTopicOffset `json:"offsets"`
+}
+
+type ConsumerGroupMember struct {
+	ID       string   `json:"id"`
+	ClientID string   `json:"clientId"`
+	Host     string   `json:"host"`
+	Topics   []string `json:"topics"`
+}
+
+type ConsumerGroupTopicOffset struct {
+	Topic      string                         `json:"topic"`
+	Partitions []ConsumerGroupPartitionOffset `json:"partitions"`
+	TotalLag   int64                          `json:"totalLag"`
+}
+
+type ConsumerGroupPartitionOffset struct {
+	Partition     int32 `json:"partition"`
+	CurrentOffset int64 `json:"currentOffset"`
+	EndOffset     int64 `json:"endOffset"`
+	Lag           int64 `json:"lag"`
+}
+
+type ResetOffsetsRequest struct {
+	Topic   string `json:"topic"`
+	ResetTo string `json:"resetTo"`
 }
 
 func NewClient(cfg config.ClusterConfig) (*Client, error) {
@@ -394,4 +436,179 @@ func (c *Client) ProduceMessage(ctx context.Context, topic string, req ProduceRe
 		Value:     string(r.Value),
 		Headers:   headers,
 	}, nil
+}
+
+func (c *Client) ConsumerGroups(ctx context.Context) ([]ConsumerGroupInfo, error) {
+	listed, err := c.admin.ListGroups(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("listing consumer groups: %w", err)
+	}
+
+	groupNames := listed.Groups()
+	if len(groupNames) == 0 {
+		return []ConsumerGroupInfo{}, nil
+	}
+
+	described, err := c.admin.DescribeGroups(ctx, groupNames...)
+	if err != nil {
+		return nil, fmt.Errorf("describing consumer groups: %w", err)
+	}
+
+	result := make([]ConsumerGroupInfo, 0, len(described.Sorted()))
+	for _, g := range described.Sorted() {
+		assignedTopics := g.AssignedPartitions()
+		result = append(result, ConsumerGroupInfo{
+			Name:          g.Group,
+			State:         g.State,
+			Members:       len(g.Members),
+			TopicCount:    len(assignedTopics),
+			CoordinatorID: g.Coordinator.NodeID,
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+
+	return result, nil
+}
+
+func (c *Client) ConsumerGroupDetails(ctx context.Context, name string) (*ConsumerGroupDetail, error) {
+	described, err := c.admin.DescribeGroups(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("describing consumer group: %w", err)
+	}
+
+	sorted := described.Sorted()
+	if len(sorted) == 0 {
+		return nil, fmt.Errorf("consumer group %q not found", name)
+	}
+	g := sorted[0]
+
+	members := make([]ConsumerGroupMember, 0, len(g.Members))
+	for _, m := range g.Members {
+		var memberTopics []string
+		if ca, ok := m.Assigned.AsConsumer(); ok {
+			for _, t := range ca.Topics {
+				memberTopics = append(memberTopics, t.Topic)
+			}
+		}
+		members = append(members, ConsumerGroupMember{
+			ID:       m.MemberID,
+			ClientID: m.ClientID,
+			Host:     m.ClientHost,
+			Topics:   memberTopics,
+		})
+	}
+
+	offsetResp, err := c.admin.FetchOffsets(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("fetching offsets for group %q: %w", name, err)
+	}
+
+	// Collect all topics that have committed offsets.
+	topicSet := make(map[string]struct{})
+	offsetResp.Each(func(o kadm.OffsetResponse) {
+		topicSet[o.Topic] = struct{}{}
+	})
+
+	topicNames := make([]string, 0, len(topicSet))
+	for t := range topicSet {
+		topicNames = append(topicNames, t)
+	}
+
+	var endOffsets kadm.ListedOffsets
+	if len(topicNames) > 0 {
+		endOffsets, err = c.admin.ListEndOffsets(ctx, topicNames...)
+		if err != nil {
+			return nil, fmt.Errorf("listing end offsets: %w", err)
+		}
+	}
+
+	// Build per-topic offset information.
+	type partInfo struct {
+		partition     int32
+		currentOffset int64
+		endOffset     int64
+		lag           int64
+	}
+	topicPartitions := make(map[string][]partInfo)
+
+	offsetResp.Each(func(o kadm.OffsetResponse) {
+		end := int64(0)
+		if lo, ok := endOffsets.Lookup(o.Topic, o.Partition); ok {
+			end = lo.Offset
+		}
+		lag := end - o.Offset.At
+		if lag < 0 {
+			lag = 0
+		}
+		topicPartitions[o.Topic] = append(topicPartitions[o.Topic], partInfo{
+			partition:     o.Partition,
+			currentOffset: o.Offset.At,
+			endOffset:     end,
+			lag:           lag,
+		})
+	})
+
+	offsets := make([]ConsumerGroupTopicOffset, 0, len(topicPartitions))
+	for topic, parts := range topicPartitions {
+		sort.Slice(parts, func(i, j int) bool {
+			return parts[i].partition < parts[j].partition
+		})
+		var totalLag int64
+		partitions := make([]ConsumerGroupPartitionOffset, 0, len(parts))
+		for _, p := range parts {
+			totalLag += p.lag
+			partitions = append(partitions, ConsumerGroupPartitionOffset{
+				Partition:     p.partition,
+				CurrentOffset: p.currentOffset,
+				EndOffset:     p.endOffset,
+				Lag:           p.lag,
+			})
+		}
+		offsets = append(offsets, ConsumerGroupTopicOffset{
+			Topic:      topic,
+			Partitions: partitions,
+			TotalLag:   totalLag,
+		})
+	}
+
+	sort.Slice(offsets, func(i, j int) bool {
+		return offsets[i].Topic < offsets[j].Topic
+	})
+
+	return &ConsumerGroupDetail{
+		Name:          g.Group,
+		State:         g.State,
+		CoordinatorID: g.Coordinator.NodeID,
+		Members:       members,
+		Offsets:       offsets,
+	}, nil
+}
+
+func (c *Client) ResetConsumerGroupOffsets(ctx context.Context, group string, req ResetOffsetsRequest) error {
+	var targetOffsets kadm.ListedOffsets
+	var err error
+
+	switch req.ResetTo {
+	case "earliest":
+		targetOffsets, err = c.admin.ListStartOffsets(ctx, req.Topic)
+	case "latest":
+		targetOffsets, err = c.admin.ListEndOffsets(ctx, req.Topic)
+	default:
+		return fmt.Errorf("unsupported resetTo value: %q (must be \"earliest\" or \"latest\")", req.ResetTo)
+	}
+	if err != nil {
+		return fmt.Errorf("listing %s offsets for topic %q: %w", req.ResetTo, req.Topic, err)
+	}
+
+	offsets := targetOffsets.Offsets()
+
+	_, err = c.admin.CommitOffsets(ctx, group, offsets)
+	if err != nil {
+		return fmt.Errorf("committing offsets for group %q: %w", group, err)
+	}
+
+	return nil
 }

@@ -53,3 +53,98 @@ func TestRegistry_List(t *testing.T) {
 		t.Fatalf("expected 2 clusters, got %d", len(list))
 	}
 }
+
+func TestRegistry_EmptyConfig(t *testing.T) {
+	cfg := &config.Config{Clusters: []config.ClusterConfig{}}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	list := reg.List()
+	if len(list) != 0 {
+		t.Fatalf("expected 0 clusters, got %d", len(list))
+	}
+}
+
+func TestRegistry_GetConfig(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "test", BootstrapServers: "host1:9092,host2:9092"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	cc, ok := reg.GetConfig("test")
+	if !ok {
+		t.Fatal("expected to find config for 'test'")
+	}
+	if cc.BootstrapServers != "host1:9092,host2:9092" {
+		t.Errorf("expected bootstrap servers 'host1:9092,host2:9092', got %q", cc.BootstrapServers)
+	}
+
+	_, ok = reg.GetConfig("nonexistent")
+	if ok {
+		t.Fatal("expected not to find config for 'nonexistent'")
+	}
+}
+
+func TestRegistry_ListPreservesOrder(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "charlie", BootstrapServers: "localhost:9092"},
+			{Name: "alpha", BootstrapServers: "localhost:9093"},
+			{Name: "bravo", BootstrapServers: "localhost:9094"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	list := reg.List()
+	if len(list) != 3 {
+		t.Fatalf("expected 3 clusters, got %d", len(list))
+	}
+	expected := []string{"charlie", "alpha", "bravo"}
+	for i, name := range expected {
+		if list[i].Name != name {
+			t.Errorf("expected cluster[%d] = %q, got %q", i, name, list[i].Name)
+		}
+	}
+}
+
+func TestRegistry_ClientConfig(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{
+				Name:             "test",
+				BootstrapServers: "kafka:9092",
+				SASL: config.SASLConfig{
+					Mechanism: "PLAIN",
+					Username:  "user",
+					Password:  "pass",
+				},
+			},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	client, ok := reg.Get("test")
+	if !ok {
+		t.Fatal("expected to find client 'test'")
+	}
+	if client.Config().SASL.Mechanism != "PLAIN" {
+		t.Errorf("expected SASL mechanism 'PLAIN', got %q", client.Config().SASL.Mechanism)
+	}
+}
