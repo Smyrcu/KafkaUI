@@ -2,14 +2,18 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api, type CreateTopicRequest } from "@/lib/api";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, FileText } from "lucide-react";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { PageHeader } from "@/components/PageHeader";
+import { DataTable } from "@/components/DataTable";
+import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/PageSkeleton";
+import type { TopicInfo } from "@/lib/api";
 
 export function TopicsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
@@ -18,7 +22,7 @@ export function TopicsPage() {
   const [search, setSearch] = useState("");
   const [newTopic, setNewTopic] = useState<CreateTopicRequest>({ name: "", partitions: 1, replicas: 1 });
 
-  const { data: topics, isLoading, error } = useQuery({
+  const { data: topics, isLoading, error, refetch } = useQuery({
     queryKey: ["topics", clusterName],
     queryFn: () => api.topics.list(clusterName!),
     enabled: !!clusterName,
@@ -38,78 +42,78 @@ export function TopicsPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["topics", clusterName] }); },
   });
 
-  const filteredTopics = topics?.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()));
-  if (isLoading) return <div className="text-muted-foreground">Loading topics...</div>;
-  if (error) return <ErrorAlert message={(error as Error).message} />;
+  const filteredTopics = topics?.filter((t) => t.name.toLowerCase().includes(search.toLowerCase())) ?? [];
+
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/" },
+    { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
+    { label: "Topics" },
+  ];
+
+  if (isLoading) return <><PageHeader title="Topics" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
+  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Topics</h2>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Create Topic</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Create Topic</DialogTitle></DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" value={newTopic.name} onChange={(e) => setNewTopic({ ...newTopic, name: e.target.value })} placeholder="my-topic" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+      <PageHeader
+        title="Topics"
+        description={`Manage topics in ${clusterName}`}
+        breadcrumbs={breadcrumbs}
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" />Create Topic</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Create Topic</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="partitions">Partitions</Label>
-                  <Input id="partitions" type="number" min={1} value={newTopic.partitions} onChange={(e) => setNewTopic({ ...newTopic, partitions: parseInt(e.target.value) || 1 })} />
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" value={newTopic.name} onChange={(e) => setNewTopic({ ...newTopic, name: e.target.value })} placeholder="my-topic" />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="replicas">Replicas</Label>
-                  <Input id="replicas" type="number" min={1} value={newTopic.replicas} onChange={(e) => setNewTopic({ ...newTopic, replicas: parseInt(e.target.value) || 1 })} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="partitions">Partitions</Label>
+                    <Input id="partitions" type="number" min={1} value={newTopic.partitions} onChange={(e) => setNewTopic({ ...newTopic, partitions: parseInt(e.target.value) || 1 })} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="replicas">Replicas</Label>
+                    <Input id="replicas" type="number" min={1} value={newTopic.replicas} onChange={(e) => setNewTopic({ ...newTopic, replicas: parseInt(e.target.value) || 1 })} />
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={() => createMutation.mutate(newTopic)} disabled={!newTopic.name || createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create"}
-              </Button>
-            </DialogFooter>
-            {createMutation.isError && <p className="text-sm text-destructive mt-2">{(createMutation.error as Error).message}</p>}
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button onClick={() => createMutation.mutate(newTopic)} disabled={!newTopic.name || createMutation.isPending}>
+                  {createMutation.isPending ? "Creating..." : "Create"}
+                </Button>
+              </DialogFooter>
+              {createMutation.isError && <p className="text-sm text-destructive mt-2">{(createMutation.error as Error).message}</p>}
+            </DialogContent>
+          </Dialog>
+        }
+      />
       <div className="mb-4">
         <Input placeholder="Search topics..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Partitions</TableHead>
-            <TableHead>Replicas</TableHead>
-            <TableHead>Internal</TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredTopics?.map((topic) => (
-            <TableRow key={topic.name}>
-              <TableCell>
-                <Link to={`/clusters/${clusterName}/topics/${topic.name}`} className="text-primary hover:underline font-medium">{topic.name}</Link>
-              </TableCell>
-              <TableCell>{topic.partitions}</TableCell>
-              <TableCell>{topic.replicas}</TableCell>
-              <TableCell>{topic.internal && <Badge variant="secondary">internal</Badge>}</TableCell>
-              <TableCell>
-                {!topic.internal && (
-                  <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Delete topic "${topic.name}"?`)) deleteMutation.mutate(topic.name); }}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {filteredTopics.length === 0 ? (
+        <EmptyState icon={FileText} title="No topics found" description={search ? "No topics match your search." : "This cluster has no topics yet."} actionLabel={!search ? "Create Topic" : undefined} onAction={!search ? () => setOpen(true) : undefined} />
+      ) : (
+        <DataTable<TopicInfo>
+          itemName="topics"
+          data={filteredTopics}
+          columns={[
+            { header: "Name", cell: (t) => <Link to={`/clusters/${clusterName}/topics/${t.name}`} className="text-primary hover:underline font-medium">{t.name}</Link> },
+            { header: "Partitions", accessorKey: "partitions" },
+            { header: "Replicas", accessorKey: "replicas" },
+            { header: "Internal", cell: (t) => t.internal ? <Badge variant="secondary">internal</Badge> : null },
+            { header: "Actions", className: "w-[80px]", cell: (t) => !t.internal ? (
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); if (confirm(`Delete topic "${t.name}"?`)) deleteMutation.mutate(t.name); }}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            ) : null },
+          ]}
+        />
+      )}
     </div>
   );
 }

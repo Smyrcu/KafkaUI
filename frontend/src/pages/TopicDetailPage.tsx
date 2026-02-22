@@ -6,26 +6,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { TopicTabs } from "@/components/TopicTabs";
+import { PageHeader } from "@/components/PageHeader";
+import { DetailSkeleton } from "@/components/PageSkeleton";
 
 export function TopicDetailPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
-  const { data: topic, isLoading, error } = useQuery({
+  const { data: topic, isLoading, error, refetch } = useQuery({
     queryKey: ["topic", clusterName, topicName],
     queryFn: () => api.topics.details(clusterName!, topicName!),
     enabled: !!clusterName && !!topicName,
   });
-  if (isLoading) return <div className="text-muted-foreground">Loading topic details...</div>;
-  if (error) return <ErrorAlert message={(error as Error).message} />;
+
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/" },
+    { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
+    { label: "Topics", href: `/clusters/${clusterName}/topics` },
+    { label: topicName! },
+  ];
+
+  if (isLoading) return <DetailSkeleton />;
+  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
   if (!topic) return null;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold">{topic.name}</h2>
-        {topic.internal && <Badge variant="secondary">internal</Badge>}
-      </div>
+      <PageHeader
+        title={topic.name}
+        breadcrumbs={breadcrumbs}
+        actions={topic.internal ? <Badge variant="secondary">internal</Badge> : undefined}
+      />
       <TopicTabs />
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="animate-scale-in">
           <CardHeader><CardTitle>Partitions</CardTitle></CardHeader>
           <CardContent>
             <Table>
@@ -36,7 +48,7 @@ export function TopicDetailPage() {
               </TableHeader>
               <TableBody>
                 {topic.partitions.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className={p.id % 2 === 1 ? "bg-muted/30" : ""}>
                     <TableCell><Badge variant="outline">{p.id}</Badge></TableCell>
                     <TableCell>{p.leader}</TableCell>
                     <TableCell>{p.replicas.join(", ")}</TableCell>
@@ -47,14 +59,14 @@ export function TopicDetailPage() {
             </Table>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="animate-scale-in">
           <CardHeader><CardTitle>Configuration</CardTitle></CardHeader>
           <CardContent>
             <Table>
               <TableHeader><TableRow><TableHead>Key</TableHead><TableHead>Value</TableHead></TableRow></TableHeader>
               <TableBody>
-                {Object.entries(topic.configs).map(([key, value]) => (
-                  <TableRow key={key}>
+                {Object.entries(topic.configs).map(([key, value], i) => (
+                  <TableRow key={key} className={i % 2 === 1 ? "bg-muted/30" : ""}>
                     <TableCell className="font-mono text-xs">{key}</TableCell>
                     <TableCell className="font-mono text-xs">{value}</TableCell>
                   </TableRow>
