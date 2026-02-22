@@ -1,20 +1,28 @@
 import { AppSidebar } from "./AppSidebar";
 import { Outlet } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 
 export function Layout() {
   return (
-    <div className="flex h-screen bg-background">
+    <SidebarProvider>
       <AppSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 shrink-0 flex items-center gap-2 border-b px-6">
-          <h1 className="text-sm font-medium flex-1">Kafka UI</h1>
+      <SidebarInset>
+        <header className="h-14 shrink-0 flex items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="h-4" />
+          <div className="flex-1" />
           <ThemeToggle />
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6">
           <Outlet />
-        </main>
-      </div>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -1,8 +1,33 @@
 import { Link, useParams, useLocation } from "react-router-dom";
-import { Database, Server, FileText, Users, Shield, PlugZap, Terminal, BookOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Database,
+  Server,
+  FileText,
+  Users,
+  Shield,
+  PlugZap,
+  Terminal,
+  BookOpen,
+  LayoutDashboard,
+  Layers,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 
-const navItems = [
+const clusterNavItems = [
   { label: "Brokers", icon: Server, path: "brokers" },
   { label: "Topics", icon: FileText, path: "topics" },
   { label: "Consumer Groups", icon: Users, path: "consumer-groups" },
@@ -16,45 +41,133 @@ export function AppSidebar() {
   const { clusterName } = useParams();
   const location = useLocation();
 
+  const { data: clusters } = useQuery({
+    queryKey: ["clusters"],
+    queryFn: api.clusters.list,
+  });
+
   return (
-    <aside className="w-64 shrink-0 border-r bg-muted/30 flex flex-col">
-      <div className="h-14 shrink-0 flex items-center gap-2 px-4 border-b">
-        <Link to="/" className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          <span className="text-lg font-bold tracking-tight">KafkaUI</span>
-        </Link>
-      </div>
-      <nav className="flex-1 overflow-auto py-2">
-        {clusterName && (
-          <div className="px-3 py-2">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground px-2 mb-2">
-              {clusterName}
-            </p>
-            <ul className="space-y-1">
-              {navItems.map((item) => {
-                const href = `/clusters/${clusterName}/${item.path}`;
-                const isActive = location.pathname.startsWith(href);
-                return (
-                  <li key={item.path}>
-                    <Link
-                      to={href}
-                      className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                        isActive
-                          ? "bg-accent text-accent-foreground font-medium"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild tooltip="KafkaUI">
+              <Link to="/">
+                <div className="flex items-center justify-center rounded-md bg-primary p-1.5 text-primary-foreground">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col gap-0.5 leading-none">
+                  <span className="font-semibold">KafkaUI</span>
+                  <span className="text-xs opacity-70">Dashboard</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/"}
+                  tooltip="Dashboard"
+                >
+                  <Link to="/">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === "/clusters"}
+                  tooltip="Clusters"
+                >
+                  <Link to="/clusters">
+                    <Layers className="h-4 w-4" />
+                    <span>Clusters</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {clusters && clusters.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Clusters</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {clusters.map((cluster) => (
+                    <SidebarMenuItem key={cluster.name}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={clusterName === cluster.name && !clusterNavItems.some(
+                          (item) => location.pathname.startsWith(`/clusters/${cluster.name}/${item.path}`)
+                        )}
+                        tooltip={cluster.name}
+                      >
+                        <Link to={`/clusters/${cluster.name}/brokers`}>
+                          <Database className="h-4 w-4" />
+                          <span>{cluster.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         )}
-      </nav>
-    </aside>
+
+        {clusterName && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>{clusterName}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {clusterNavItems.map((item) => {
+                    const href = `/clusters/${clusterName}/${item.path}`;
+                    const isActive = location.pathname.startsWith(href);
+                    return (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          tooltip={item.label}
+                        >
+                          <Link to={href}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="sm" className="text-xs opacity-50 pointer-events-none">
+              <span>v0.1.0</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }

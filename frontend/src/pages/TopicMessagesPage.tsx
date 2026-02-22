@@ -12,7 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ErrorAlert } from "@/components/ErrorAlert";
-import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/PageSkeleton";
+import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
 
 type OffsetMode = "latest" | "earliest" | "timestamp" | "custom";
 
@@ -93,11 +96,17 @@ export function TopicMessagesPage() {
     try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; }
   };
 
+  const breadcrumbs = [
+    { label: "Dashboard", href: "/" },
+    { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
+    { label: "Topics", href: `/clusters/${clusterName}/topics` },
+    { label: topicName!, href: `/clusters/${clusterName}/topics/${topicName}` },
+    { label: "Messages" },
+  ];
+
   return (
     <div>
-      <div className="flex items-center gap-3 mb-2">
-        <h2 className="text-2xl font-bold">{topicName}</h2>
-      </div>
+      <PageHeader title={topicName!} breadcrumbs={breadcrumbs} />
       <TopicTabs />
 
       {/* Toolbar */}
@@ -209,66 +218,73 @@ export function TopicMessagesPage() {
       {error && <ErrorAlert message={(error as Error).message} />}
 
       {/* Message table */}
-      {messages.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8"></TableHead>
-              <TableHead>Partition</TableHead>
-              <TableHead>Offset</TableHead>
-              <TableHead>Timestamp</TableHead>
-              <TableHead>Key</TableHead>
-              <TableHead>Value</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {messages.map((m) => {
-              const key = rowKey(m);
-              const isExpanded = expandedRow === key;
-              return (
-                <Fragment key={key}>
-                  <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedRow(isExpanded ? null : key)}>
-                    <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
-                    <TableCell><Badge variant="outline">{m.partition}</Badge></TableCell>
-                    <TableCell className="font-mono text-xs">{m.offset}</TableCell>
-                    <TableCell className="text-xs">{new Date(m.timestamp).toLocaleString()}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-[150px] truncate">{m.key || <span className="text-muted-foreground">null</span>}</TableCell>
-                    <TableCell className="font-mono text-xs max-w-[300px] truncate">{m.value}</TableCell>
-                  </TableRow>
-                  {isExpanded && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="bg-muted/30 p-4">
-                        <div className="grid gap-3">
-                          <div>
-                            <p className="text-xs font-semibold mb-1">Key</p>
-                            <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-32">{m.key ? tryFormatJson(m.key) : "null"}</pre>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold mb-1">Value</p>
-                            <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-64">{tryFormatJson(m.value)}</pre>
-                          </div>
-                          {m.headers && Object.keys(m.headers).length > 0 && (
-                            <div>
-                              <p className="text-xs font-semibold mb-1">Headers</p>
-                              <pre className="text-xs bg-background rounded p-2 border overflow-auto">{JSON.stringify(m.headers, null, 2)}</pre>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
+      {isLoading ? (
+        <TableSkeleton rows={5} cols={6} />
+      ) : messages.length > 0 ? (
+        <div className="rounded-lg border bg-card animate-scale-in">
+          <div className="px-4 py-3 border-b">
+            <p className="text-sm text-muted-foreground">{messages.length} messages</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-8"></TableHead>
+                <TableHead>Partition</TableHead>
+                <TableHead>Offset</TableHead>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>Key</TableHead>
+                <TableHead>Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {messages.map((m, i) => {
+                const key = rowKey(m);
+                const isExpanded = expandedRow === key;
+                return (
+                  <Fragment key={key}>
+                    <TableRow className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/30" : ""}`} onClick={() => setExpandedRow(isExpanded ? null : key)}>
+                      <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
+                      <TableCell><Badge variant="outline">{m.partition}</Badge></TableCell>
+                      <TableCell className="font-mono text-xs">{m.offset}</TableCell>
+                      <TableCell className="text-xs">{new Date(m.timestamp).toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[150px] truncate">{m.key || <span className="text-muted-foreground">null</span>}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[300px] truncate">{m.value}</TableCell>
                     </TableRow>
-                  )}
-                </Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="bg-muted/30 p-4">
+                          <div className="grid gap-3">
+                            <div>
+                              <p className="text-xs font-semibold mb-1">Key</p>
+                              <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-32">{m.key ? tryFormatJson(m.key) : "null"}</pre>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold mb-1">Value</p>
+                              <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-64">{tryFormatJson(m.value)}</pre>
+                            </div>
+                            {m.headers && Object.keys(m.headers).length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold mb-1">Headers</p>
+                                <pre className="text-xs bg-background rounded p-2 border overflow-auto">{JSON.stringify(m.headers, null, 2)}</pre>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
-        !isLoading && !isLiveTail && (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
-              Click "Fetch" to browse messages or "Live Tail" to stream new messages
-            </CardContent>
-          </Card>
+        !isLiveTail && (
+          <EmptyState
+            icon={MessageSquare}
+            title="No messages"
+            description='Click "Fetch" to browse messages or "Live Tail" to stream new messages.'
+          />
         )
       )}
     </div>
