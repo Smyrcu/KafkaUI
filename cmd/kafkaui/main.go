@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Smyrcu/KafkaUI/internal/api"
+	"github.com/Smyrcu/KafkaUI/internal/auth"
 	"github.com/Smyrcu/KafkaUI/internal/config"
 	fe "github.com/Smyrcu/KafkaUI/internal/frontend"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
@@ -39,7 +40,13 @@ func main() {
 	}
 	defer registry.Close()
 
-	router := api.NewRouter(registry, logger)
+	sessionSecret := cfg.Auth.Session.Secret
+	if sessionSecret == "" {
+		sessionSecret = "kafkaui-default-secret-change-me"
+	}
+	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
+
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {

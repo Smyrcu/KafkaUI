@@ -211,6 +211,341 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /clusters/{clusterName}/consumer-groups:
+    get:
+      summary: List consumer groups
+      description: Returns all consumer groups for a given cluster
+      operationId: listConsumerGroups
+      tags: [Consumer Groups]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+      responses:
+        "200":
+          description: List of consumer groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConsumerGroupInfo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /clusters/{clusterName}/consumer-groups/{groupName}:
+    get:
+      summary: Get consumer group details
+      description: Returns detailed information about a consumer group including lag
+      operationId: getConsumerGroupDetails
+      tags: [Consumer Groups]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/GroupName"
+      responses:
+        "200":
+          description: Consumer group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsumerGroupDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /clusters/{clusterName}/consumer-groups/{groupName}/reset:
+    post:
+      summary: Reset consumer group offsets
+      description: Reset offsets for a consumer group on a specific topic
+      operationId: resetConsumerGroupOffsets
+      tags: [Consumer Groups]
+      parameters:
+        - $ref: "#/components/parameters/ClusterName"
+        - $ref: "#/components/parameters/GroupName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetOffsetsRequest"
+      responses:
+        "200":
+          description: Offsets reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /clusters/{clusterName}/schemas:
+    get:
+      tags: [Schema Registry]
+      summary: List schema subjects
+      operationId: listSchemas
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      responses:
+        '200':
+          description: List of schema subjects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SchemaSubjectInfo'
+    post:
+      tags: [Schema Registry]
+      summary: Register a new schema
+      operationId: createSchema
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSchemaRequest'
+      responses:
+        '201':
+          description: Schema registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSchemaResponse'
+
+  /clusters/{clusterName}/schemas/{subject}:
+    get:
+      tags: [Schema Registry]
+      summary: Get schema subject details
+      operationId: getSchemaDetails
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/Subject'
+      responses:
+        '200':
+          description: Schema subject details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaDetail'
+    delete:
+      tags: [Schema Registry]
+      summary: Delete a schema subject
+      operationId: deleteSchema
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/Subject'
+      responses:
+        '200':
+          description: Schema deleted
+
+  /clusters/{clusterName}/connectors:
+    get:
+      tags: [Kafka Connect]
+      summary: List connectors
+      operationId: listConnectors
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      responses:
+        '200':
+          description: List of connectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConnectorInfo'
+    post:
+      tags: [Kafka Connect]
+      summary: Create a connector
+      operationId: createConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectorRequest'
+      responses:
+        '201':
+          description: Connector created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorDetail'
+
+  /clusters/{clusterName}/connectors/{connectorName}:
+    get:
+      tags: [Kafka Connect]
+      summary: Get connector details
+      operationId: getConnectorDetails
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      responses:
+        '200':
+          description: Connector details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorDetail'
+    put:
+      tags: [Kafka Connect]
+      summary: Update connector config
+      operationId: updateConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        '200':
+          description: Connector updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorDetail'
+    delete:
+      tags: [Kafka Connect]
+      summary: Delete a connector
+      operationId: deleteConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      responses:
+        '200':
+          description: Connector deleted
+
+  /clusters/{clusterName}/connectors/{connectorName}/restart:
+    post:
+      tags: [Kafka Connect]
+      summary: Restart a connector
+      operationId: restartConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      responses:
+        '200':
+          description: Connector restarted
+
+  /clusters/{clusterName}/connectors/{connectorName}/pause:
+    post:
+      tags: [Kafka Connect]
+      summary: Pause a connector
+      operationId: pauseConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      responses:
+        '200':
+          description: Connector paused
+
+  /clusters/{clusterName}/connectors/{connectorName}/resume:
+    post:
+      tags: [Kafka Connect]
+      summary: Resume a connector
+      operationId: resumeConnector
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+        - $ref: '#/components/parameters/ConnectorName'
+      responses:
+        '200':
+          description: Connector resumed
+
+  /clusters/{clusterName}/ksql:
+    post:
+      tags: [KSQL]
+      summary: Execute KSQL statement
+      operationId: executeKsql
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KsqlRequest'
+      responses:
+        '200':
+          description: KSQL execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KsqlResponse'
+
+  /clusters/{clusterName}/ksql/info:
+    get:
+      tags: [KSQL]
+      summary: Get KSQL server info
+      operationId: getKsqlInfo
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      responses:
+        '200':
+          description: KSQL server info
+
+  /clusters/{clusterName}/acls:
+    get:
+      tags: [ACL]
+      summary: List ACLs
+      operationId: listAcls
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      responses:
+        '200':
+          description: List of ACL entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ACLEntry'
+    post:
+      tags: [ACL]
+      summary: Create ACL
+      operationId: createAcl
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ACLEntry'
+      responses:
+        '201':
+          description: ACL created
+
+  /clusters/{clusterName}/acls/delete:
+    post:
+      tags: [ACL]
+      summary: Delete matching ACL
+      operationId: deleteAcl
+      parameters:
+        - $ref: '#/components/parameters/ClusterName'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ACLEntry'
+      responses:
+        '200':
+          description: ACL deleted
+
 components:
   parameters:
     ClusterName:
@@ -227,6 +562,25 @@ components:
       schema:
         type: string
       description: Name of the topic
+    GroupName:
+      name: groupName
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Name of the consumer group
+    Subject:
+      name: subject
+      in: path
+      required: true
+      schema:
+        type: string
+    ConnectorName:
+      name: connectorName
+      in: path
+      required: true
+      schema:
+        type: string
 
   schemas:
     ClusterInfo:
@@ -361,6 +715,258 @@ components:
           type: object
           additionalProperties:
             type: string
+
+    ConsumerGroupInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: my-consumer-group
+        state:
+          type: string
+          example: Stable
+        members:
+          type: integer
+          example: 3
+        topics:
+          type: integer
+          example: 2
+        coordinatorId:
+          type: integer
+          example: 0
+
+    ConsumerGroupDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        state:
+          type: string
+        coordinatorId:
+          type: integer
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumerGroupMember"
+        offsets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumerGroupTopicOffset"
+
+    ConsumerGroupMember:
+      type: object
+      properties:
+        id:
+          type: string
+        clientId:
+          type: string
+        host:
+          type: string
+        topics:
+          type: array
+          items:
+            type: string
+
+    ConsumerGroupTopicOffset:
+      type: object
+      properties:
+        topic:
+          type: string
+        partitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConsumerGroupPartitionOffset"
+        totalLag:
+          type: integer
+          format: int64
+
+    ConsumerGroupPartitionOffset:
+      type: object
+      properties:
+        partition:
+          type: integer
+        currentOffset:
+          type: integer
+          format: int64
+        endOffset:
+          type: integer
+          format: int64
+        lag:
+          type: integer
+          format: int64
+
+    ResetOffsetsRequest:
+      type: object
+      required: [topic, resetTo]
+      properties:
+        topic:
+          type: string
+          example: my-topic
+        resetTo:
+          type: string
+          enum: [earliest, latest]
+          example: earliest
+
+    SchemaSubjectInfo:
+      type: object
+      properties:
+        subject:
+          type: string
+        latestVersion:
+          type: integer
+        latestSchemaId:
+          type: integer
+        schemaType:
+          type: string
+
+    SchemaDetail:
+      type: object
+      properties:
+        subject:
+          type: string
+        compatibility:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaVersion'
+
+    SchemaVersion:
+      type: object
+      properties:
+        version:
+          type: integer
+        id:
+          type: integer
+        schema:
+          type: string
+        schemaType:
+          type: string
+
+    CreateSchemaRequest:
+      type: object
+      required: [subject, schema]
+      properties:
+        subject:
+          type: string
+        schema:
+          type: string
+        schemaType:
+          type: string
+          default: AVRO
+
+    CreateSchemaResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+
+    ConnectorInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [source, sink]
+        state:
+          type: string
+          enum: [RUNNING, PAUSED, FAILED, UNASSIGNED]
+        workerId:
+          type: string
+        connectCluster:
+          type: string
+
+    ConnectorDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        state:
+          type: string
+        workerId:
+          type: string
+        config:
+          type: object
+          additionalProperties:
+            type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskStatus'
+        connectCluster:
+          type: string
+
+    TaskStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+        state:
+          type: string
+        workerId:
+          type: string
+        trace:
+          type: string
+
+    CreateConnectorRequest:
+      type: object
+      required: [name, config]
+      properties:
+        name:
+          type: string
+        config:
+          type: object
+          additionalProperties:
+            type: string
+
+    KsqlRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+
+    KsqlResponse:
+      type: object
+      properties:
+        type:
+          type: string
+        statementText:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+        data:
+          type: object
+
+    ACLEntry:
+      type: object
+      properties:
+        resourceType:
+          type: string
+          enum: [TOPIC, GROUP, CLUSTER, TRANSACTIONAL_ID]
+        resourceName:
+          type: string
+        patternType:
+          type: string
+          enum: [LITERAL, PREFIXED]
+        principal:
+          type: string
+        host:
+          type: string
+        operation:
+          type: string
+          enum: [ALL, READ, WRITE, CREATE, DELETE, ALTER, DESCRIBE, CLUSTER_ACTION, DESCRIBE_CONFIGS, ALTER_CONFIGS, IDEMPOTENT_WRITE]
+        permission:
+          type: string
+          enum: [ALLOW, DENY]
 
     ErrorResponse:
       type: object

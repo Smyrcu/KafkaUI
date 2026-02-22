@@ -9,9 +9,24 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig    `yaml:"server"`
-	Auth     AuthConfig      `yaml:"auth"`
-	Clusters []ClusterConfig `yaml:"clusters"`
+	Server      ServerConfig    `yaml:"server"`
+	Auth        AuthConfig      `yaml:"auth"`
+	Clusters    []ClusterConfig `yaml:"clusters"`
+	DataMasking DataMaskingConfig `yaml:"data-masking"`
+}
+
+type DataMaskingConfig struct {
+	Rules []MaskingRule `yaml:"rules"`
+}
+
+type MaskingRule struct {
+	TopicPattern string        `yaml:"topic-pattern"`
+	Fields       []MaskingField `yaml:"fields"`
+}
+
+type MaskingField struct {
+	Path string `yaml:"path"`
+	Type string `yaml:"type"` // mask, hide, hash
 }
 
 type ServerConfig struct {
@@ -20,8 +35,30 @@ type ServerConfig struct {
 }
 
 type AuthConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Type    string `yaml:"type"`
+	Enabled bool       `yaml:"enabled"`
+	Type    string     `yaml:"type"`
+	OIDC    OIDCConfig `yaml:"oidc"`
+	Session SessionConfig `yaml:"session"`
+	RBAC    []RBACRule `yaml:"rbac"`
+}
+
+type OIDCConfig struct {
+	Issuer       string   `yaml:"issuer"`
+	ClientID     string   `yaml:"client-id"`
+	ClientSecret string   `yaml:"client-secret"`
+	Scopes       []string `yaml:"scopes"`
+	RedirectURL  string   `yaml:"redirect-url"`
+}
+
+type SessionConfig struct {
+	Secret string `yaml:"secret"`
+	MaxAge int    `yaml:"max-age"`
+}
+
+type RBACRule struct {
+	Role     string   `yaml:"role"`
+	Clusters []string `yaml:"clusters"`
+	Actions  []string `yaml:"actions"`
 }
 
 type ClusterConfig struct {

@@ -53,3 +53,56 @@ func TestBuildSASLOpt_UnsupportedMechanism(t *testing.T) {
 		t.Fatal("expected error for unsupported mechanism")
 	}
 }
+
+func TestNewClient_WithSASL(t *testing.T) {
+	cfg := config.ClusterConfig{
+		Name:             "sasl-test",
+		BootstrapServers: "localhost:9092",
+		SASL: config.SASLConfig{
+			Mechanism: "PLAIN",
+			Username:  "user",
+			Password:  "pass",
+		},
+	}
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.Name() != "sasl-test" {
+		t.Errorf("expected name 'sasl-test', got %q", client.Name())
+	}
+}
+
+func TestNewClient_WithTLS(t *testing.T) {
+	cfg := config.ClusterConfig{
+		Name:             "tls-test",
+		BootstrapServers: "localhost:9092",
+		TLS: config.TLSConfig{
+			Enabled: true,
+		},
+	}
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.Name() != "tls-test" {
+		t.Errorf("expected name 'tls-test', got %q", client.Name())
+	}
+}
+
+func TestNewClient_ConfigAccessor(t *testing.T) {
+	cfg := config.ClusterConfig{
+		Name:             "config-test",
+		BootstrapServers: "host1:9092,host2:9093",
+	}
+	client, err := NewClient(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer client.Close()
+	if client.Config().BootstrapServers != "host1:9092,host2:9093" {
+		t.Errorf("expected bootstrap servers, got %q", client.Config().BootstrapServers)
+	}
+}
