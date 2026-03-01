@@ -2,6 +2,7 @@ package handlers
 
 import (
 	_ "embed"
+	"log/slog"
 	"net/http"
 )
 
@@ -11,12 +12,14 @@ var openAPISpec []byte
 func SwaggerSpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Write(openAPISpec)
+	if _, err := w.Write(openAPISpec); err != nil {
+		slog.Error("failed to write OpenAPI spec", "error", err)
+	}
 }
 
 func SwaggerUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<!DOCTYPE html>
+	if _, err := w.Write([]byte(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -41,5 +44,7 @@ func SwaggerUI(w http.ResponseWriter, r *http.Request) {
     });
   </script>
 </body>
-</html>`))
+</html>`)); err != nil {
+		slog.Error("failed to write Swagger UI", "error", err)
+	}
 }

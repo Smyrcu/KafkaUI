@@ -106,6 +106,11 @@ func (h *ConnectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(clients) == 0 {
+		writeError(w, http.StatusInternalServerError, "no connect clients available")
+		return
+	}
+
 	result, err := clients[0].CreateConnector(r.Context(), req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

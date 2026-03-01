@@ -69,8 +69,11 @@ func (h *DashboardHandler) ClusterOverviewDetail(w http.ResponseWriter, r *http.
 		return
 	}
 
-	cfg, _ := h.registry.GetConfig(clusterName)
-	overview := h.getClusterStats(r.Context(), clusterName, client, cfg.BootstrapServers)
+	bootstrapServers := clusterName
+	if cfg, ok := h.registry.GetConfig(clusterName); ok {
+		bootstrapServers = cfg.BootstrapServers
+	}
+	overview := h.getClusterStats(r.Context(), clusterName, client, bootstrapServers)
 	writeJSON(w, http.StatusOK, overview)
 }
 
