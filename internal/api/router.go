@@ -13,9 +13,10 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/api/ws"
 	"github.com/Smyrcu/KafkaUI/internal/auth"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -32,7 +33,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	clusterHandler := handlers.NewClusterHandler(registry)
 	brokerHandler := handlers.NewBrokerHandler(registry)
 	topicHandler := handlers.NewTopicHandler(registry)
-	messageHandler := handlers.NewMessageHandler(registry)
+	messageHandler := handlers.NewMessageHandler(registry, maskingEngine)
 	consumerGroupHandler := handlers.NewConsumerGroupHandler(registry)
 	schemaHandler := handlers.NewSchemaHandler(registry)
 	connectHandler := handlers.NewConnectHandler(registry)
@@ -41,11 +42,17 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
+	authHandler := handlers.NewAuthHandler(authProvider, sessions, authEnabled)
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
 		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)
 
-		r.Get("/auth/status", handlers.NewAuthHandler(nil, sessions, authEnabled).Status)
+		r.Get("/auth/status", authHandler.Status)
+		r.Get("/auth/login", authHandler.Login)
+		r.Get("/auth/callback", authHandler.Callback)
+		r.Get("/auth/me", authHandler.Me)
+		r.Post("/auth/logout", authHandler.Logout)
 
 		r.Get("/dashboard", dashboardHandler.Overview)
 		r.Get("/clusters", clusterHandler.List)

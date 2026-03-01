@@ -10,14 +10,16 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
 type MessageHandler struct {
-	registry *kafka.Registry
+	registry      *kafka.Registry
+	maskingEngine *masking.Engine
 }
 
-func NewMessageHandler(reg *kafka.Registry) *MessageHandler {
-	return &MessageHandler{registry: reg}
+func NewMessageHandler(reg *kafka.Registry, maskingEngine *masking.Engine) *MessageHandler {
+	return &MessageHandler{registry: reg, maskingEngine: maskingEngine}
 }
 
 func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +88,12 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if h.maskingEngine != nil {
+		for i := range messages {
+			messages[i].Value = h.maskingEngine.MaskMessage(topicName, messages[i].Value)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, messages)
