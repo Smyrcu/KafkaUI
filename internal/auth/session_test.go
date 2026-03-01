@@ -117,7 +117,7 @@ func TestSessionManager_ClearSession(t *testing.T) {
 
 	// Clear the session
 	clearRec := httptest.NewRecorder()
-	sm.ClearSession(clearRec)
+	sm.ClearSession(clearRec, httptest.NewRequest(http.MethodGet, "/", nil))
 
 	// Verify the cookie is expired
 	cookies := clearRec.Result().Cookies()

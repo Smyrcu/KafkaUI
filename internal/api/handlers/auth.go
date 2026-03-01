@@ -108,7 +108,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	h.sessions.ClearSession(w)
+	h.sessions.ClearSession(w, r)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "logged out"})
 }
 
@@ -150,6 +150,8 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 
 func generateState() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand failed: " + err.Error())
+	}
 	return hex.EncodeToString(b)
 }
