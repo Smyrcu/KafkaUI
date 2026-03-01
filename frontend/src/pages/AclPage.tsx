@@ -107,7 +107,20 @@ export function AclPage() {
   ];
 
   if (isLoading) return <><PageHeader title="ACL Management" breadcrumbs={breadcrumbs} /><TableSkeleton cols={8} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) {
+    const msg = (error as Error).message;
+    const notConfigured = msg.toLowerCase().includes("not configured") || msg.toLowerCase().includes("no authorizer");
+    return (
+      <div>
+        <PageHeader title="ACL Management" breadcrumbs={breadcrumbs} />
+        {notConfigured ? (
+          <EmptyState icon={Shield} title="ACL Management not available" description="No Authorizer is configured on the broker. Enable an authorizer in your Kafka broker configuration to manage access control lists." />
+        ) : (
+          <ErrorAlert message={msg} onRetry={() => refetch()} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

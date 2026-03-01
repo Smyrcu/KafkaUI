@@ -66,7 +66,20 @@ export function SchemaRegistryPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Schema Registry" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) {
+    const msg = (error as Error).message;
+    const notConfigured = msg.toLowerCase().includes("not configured");
+    return (
+      <div>
+        <PageHeader title="Schema Registry" breadcrumbs={breadcrumbs} />
+        {notConfigured ? (
+          <EmptyState icon={BookOpen} title="Schema Registry not configured" description="No Schema Registry URL is configured for this cluster. Add a schemaRegistry.url to your cluster configuration to manage schemas." />
+        ) : (
+          <ErrorAlert message={msg} onRetry={() => refetch()} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>

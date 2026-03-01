@@ -86,7 +86,20 @@ export function KafkaConnectPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Kafka Connect" breadcrumbs={breadcrumbs} /><TableSkeleton cols={6} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) {
+    const msg = (error as Error).message;
+    const notConfigured = msg.toLowerCase().includes("not configured");
+    return (
+      <div>
+        <PageHeader title="Kafka Connect" breadcrumbs={breadcrumbs} />
+        {notConfigured ? (
+          <EmptyState icon={PlugZap} title="Kafka Connect not configured" description="No Kafka Connect clusters are configured for this cluster. Add connect URLs to your cluster configuration to manage connectors." />
+        ) : (
+          <ErrorAlert message={msg} onRetry={() => refetch()} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
