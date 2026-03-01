@@ -19,7 +19,6 @@ const cookieName = "kafkaui_session"
 type SessionManager struct {
 	secret []byte
 	maxAge int
-	secure bool
 }
 
 // SessionData holds the user information stored within the session cookie.
@@ -90,14 +89,15 @@ func (sm *SessionManager) GetSession(r *http.Request) (*SessionData, error) {
 }
 
 // ClearSession removes the session by setting an expired cookie.
-func (sm *SessionManager) ClearSession(w http.ResponseWriter) {
+func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) {
+	secure := !isLocalhost(r)
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   sm.secure,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Unix(0, 0),
 	})
