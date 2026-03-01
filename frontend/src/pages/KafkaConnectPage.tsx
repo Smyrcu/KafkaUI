@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
 import { PlugZap, Plus } from "lucide-react";
 import type { ConnectorInfo } from "@/lib/api";
+import { getConnectorStateBadgeVariant } from "@/lib/helpers";
 
 export function KafkaConnectPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
@@ -69,15 +70,6 @@ export function KafkaConnectPage() {
   const filteredConnectors = connectors?.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   ) ?? [];
-
-  const getStateBadgeVariant = (state: string) => {
-    switch (state) {
-      case "RUNNING": return "success" as const;
-      case "PAUSED": return "secondary" as const;
-      case "FAILED": return "destructive" as const;
-      default: return "outline" as const;
-    }
-  };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -184,7 +176,7 @@ export function KafkaConnectPage() {
             },
             {
               header: "State",
-              cell: (c) => <Badge variant={getStateBadgeVariant(c.state)}>{c.state}</Badge>,
+              cell: (c) => <Badge variant={getConnectorStateBadgeVariant(c.state)}>{c.state}</Badge>,
             },
             { header: "Worker ID", accessorKey: "workerId" },
             { header: "Connect Cluster", accessorKey: "connectCluster" },

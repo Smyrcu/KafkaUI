@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, type KsqlResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,7 @@ function formatResultData(data: unknown): string {
 export function KsqlPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<KsqlResponse | null>(null);
 
   const executeMutation = useMutation({
     mutationFn: () => api.ksql.execute(clusterName!, { query }),

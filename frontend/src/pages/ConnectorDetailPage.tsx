@@ -13,16 +13,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { DetailSkeleton } from "@/components/PageSkeleton";
 import { EmptyState } from "@/components/EmptyState";
-import { Activity, PlugZap, Server, Layers, ListTodo } from "lucide-react";
-
-function stateBadgeVariant(state: string) {
-  switch (state.toUpperCase()) {
-    case "RUNNING": return "success" as const;
-    case "PAUSED": return "secondary" as const;
-    case "FAILED": return "destructive" as const;
-    default: return "outline" as const;
-  }
-}
+import { Activity, PlugZap, Server, ListTodo } from "lucide-react";
+import { getConnectorStateBadgeVariant } from "@/lib/helpers";
 
 export function ConnectorDetailPage() {
   const { clusterName, connectorName } = useParams<{ clusterName: string; connectorName: string }>();
@@ -92,7 +84,7 @@ export function ConnectorDetailPage() {
       const parsedConfig = JSON.parse(configJson);
       updateConfigMutation.mutate(parsedConfig);
     } catch {
-      // Invalid JSON
+      alert("Invalid JSON configuration");
     }
   }
 
@@ -103,7 +95,7 @@ export function ConnectorDetailPage() {
         breadcrumbs={breadcrumbs}
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant={stateBadgeVariant(connector.state)}>{connector.state.toUpperCase()}</Badge>
+            <Badge variant={getConnectorStateBadgeVariant(connector.state)}>{connector.state.toUpperCase()}</Badge>
             <Badge variant="secondary">{connector.type}</Badge>
             <Button variant="outline" size="sm" onClick={() => restartMutation.mutate()} disabled={restartMutation.isPending}>
               {restartMutation.isPending ? "Restarting..." : "Restart"}
@@ -154,7 +146,7 @@ export function ConnectorDetailPage() {
                   <TableRow key={task.id} className={i % 2 === 1 ? "bg-muted/30" : ""}>
                     <TableCell>{task.id}</TableCell>
                     <TableCell>
-                      <Badge variant={stateBadgeVariant(task.state)}>{task.state.toUpperCase()}</Badge>
+                      <Badge variant={getConnectorStateBadgeVariant(task.state)}>{task.state.toUpperCase()}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{task.workerId}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-md truncate">
