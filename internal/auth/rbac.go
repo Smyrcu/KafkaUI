@@ -50,29 +50,6 @@ func (r *RBAC) IsAllowed(userRoles []string, cluster string, action string) bool
 	return false
 }
 
-// GetAllowedClusters returns the list of all cluster names the user can access
-// across all of their roles. A wildcard "*" entry is preserved in the result
-// to indicate access to all clusters.
-func (r *RBAC) GetAllowedClusters(userRoles []string) []string {
-	seen := make(map[string]struct{})
-	var clusters []string
-
-	for _, userRole := range userRoles {
-		for _, rule := range r.rules {
-			if rule.Role != userRole {
-				continue
-			}
-			for _, c := range rule.Clusters {
-				if _, ok := seen[c]; !ok {
-					seen[c] = struct{}{}
-					clusters = append(clusters, c)
-				}
-			}
-		}
-	}
-	return clusters
-}
-
 // matchesEntry returns true if the list contains the value or a wildcard "*".
 func matchesEntry(list []string, value string) bool {
 	for _, entry := range list {
