@@ -21,3 +21,18 @@ Thumbs.db
 # Config with secrets
 config.yaml
 !config.example.yaml
+
+# Environment
+.env
+.env.*
+
+# TLS certificates
+*.pem
+*.key
+*.crt
+
+# Logs
+*.log
+
+# Go vendor
+/vendor/
