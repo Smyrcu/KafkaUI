@@ -27,7 +27,7 @@ func newTestRouter(t *testing.T) http.Handler {
 	t.Cleanup(reg.Close)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	sessions := auth.NewSessionManager("test-secret", 3600)
-	return NewRouter(reg, logger, sessions, false)
+	return NewRouter(reg, logger, sessions, false, nil, nil)
 }
 
 func TestRouter_ClusterRoutes(t *testing.T) {

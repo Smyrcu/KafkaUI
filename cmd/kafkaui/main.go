@@ -17,6 +17,7 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/config"
 	fe "github.com/Smyrcu/KafkaUI/internal/frontend"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
 func main() {
@@ -46,7 +47,26 @@ func main() {
 	}
 	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled)
+	// Create masking engine (nil-safe; handlers skip masking when nil rules)
+	var maskingEngine *masking.Engine
+	if len(cfg.DataMasking.Rules) > 0 {
+		maskingEngine = masking.NewEngine(cfg.DataMasking)
+		logger.Info("data masking enabled", "rules", len(cfg.DataMasking.Rules))
+	}
+
+	// Create OIDC provider if auth is enabled and type is oidc
+	var authProvider *auth.Provider
+	if cfg.Auth.Enabled && cfg.Auth.Type == "oidc" {
+		var err error
+		authProvider, err = auth.NewProvider(context.Background(), cfg.Auth.OIDC)
+		if err != nil {
+			logger.Error("failed to create OIDC provider", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("OIDC authentication enabled", "issuer", cfg.Auth.OIDC.Issuer)
+	}
+
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {
