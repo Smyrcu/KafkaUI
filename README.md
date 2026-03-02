@@ -17,7 +17,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - ACL management (create, list, delete access control entries)
 - Dashboard with cluster overview and auto-refresh
 - Authentication: SASL (PLAIN, SCRAM-SHA-256/512), TLS/SSL
-- OIDC authentication with RBAC
+- Authentication: Basic (login/password) or OIDC, with RBAC
 - Data masking engine for sensitive fields
 - Dark/Light theme
 - Swagger UI + OpenAPI spec
@@ -27,7 +27,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 
 - **Backend**: Go 1.25, chi/v5 router, franz-go Kafka client, gorilla/websocket
 - **Frontend**: React 19, TypeScript, Vite, shadcn/ui, Tailwind CSS v4, TanStack Query
-- **Auth**: OIDC, RBAC, session-based with HMAC signing
+- **Auth**: Basic (bcrypt) or OIDC, RBAC, session-based with HMAC signing
 
 ## Quick Start
 
@@ -103,15 +103,18 @@ server:
   port: 8080
   base-path: ""
 
+# Basic auth (login/password)
 auth:
   enabled: true
-  type: oidc
-  oidc:
-    issuer: https://accounts.example.com
-    client-id: kafkaui
-    client-secret: ${OIDC_CLIENT_SECRET}
-    scopes: [openid, profile, email]
-    redirect-url: http://localhost:8080/api/v1/auth/callback
+  type: basic
+  basic:
+    users:
+      - username: admin
+        password: "$2a$10$..."  # bcrypt hash
+        roles: [admin]
+      - username: viewer
+        password: "$2a$10$..."
+        roles: [viewer]
   session:
     secret: ${SESSION_SECRET}
     max-age: 86400
@@ -121,7 +124,18 @@ auth:
       actions: ["*"]
     - role: viewer
       clusters: [production]
-      actions: [read]
+      actions: [view_topics, view_messages]
+
+# Or OIDC auth
+# auth:
+#   enabled: true
+#   type: oidc
+#   oidc:
+#     issuer: https://accounts.example.com
+#     client-id: kafkaui
+#     client-secret: ${OIDC_CLIENT_SECRET}
+#     scopes: [openid, profile, email]
+#     redirect-url: http://localhost:8080/api/v1/auth/callback
 
 clusters:
   - name: production

@@ -35,11 +35,22 @@ type ServerConfig struct {
 }
 
 type AuthConfig struct {
-	Enabled bool       `yaml:"enabled"`
-	Type    string     `yaml:"type"`
-	OIDC    OIDCConfig `yaml:"oidc"`
-	Session SessionConfig `yaml:"session"`
-	RBAC    []RBACRule `yaml:"rbac"`
+	Enabled bool            `yaml:"enabled"`
+	Type    string          `yaml:"type"` // "basic" or "oidc"
+	OIDC    OIDCConfig      `yaml:"oidc"`
+	Basic   BasicAuthConfig `yaml:"basic"`
+	Session SessionConfig   `yaml:"session"`
+	RBAC    []RBACRule      `yaml:"rbac"`
+}
+
+type BasicAuthConfig struct {
+	Users []BasicUser `yaml:"users"`
+}
+
+type BasicUser struct {
+	Username string   `yaml:"username"`
+	Password string   `yaml:"password"` // bcrypt hash
+	Roles    []string `yaml:"roles"`
 }
 
 type OIDCConfig struct {

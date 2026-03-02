@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/twmb/franz-go/pkg/kgo"
 
+	celfilter "github.com/Smyrcu/KafkaUI/internal/cel"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
 
@@ -51,6 +52,17 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		http.Error(w, "cluster not found", http.StatusNotFound)
 		return
+	}
+
+	// Parse and compile CEL filter before upgrading to WebSocket
+	var filter *celfilter.Filter
+	if filterExpr := r.URL.Query().Get("filter"); filterExpr != "" {
+		var filterErr error
+		filter, filterErr = celfilter.NewFilter(filterExpr)
+		if filterErr != nil {
+			http.Error(w, filterErr.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -142,6 +154,27 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 					Value:     string(r.Value),
 					Headers:   headers,
 				}
+
+				// Apply CEL filter if provided
+				if filter != nil {
+					record := kafka.MessageRecord{
+						Partition: msg.Partition,
+						Offset:    msg.Offset,
+						Timestamp: msg.Timestamp,
+						Key:       msg.Key,
+						Value:     msg.Value,
+						Headers:   msg.Headers,
+					}
+					matched, matchErr := filter.Match(record)
+					if matchErr != nil {
+						h.logger.Error("CEL filter evaluation failed", "error", matchErr)
+						return
+					}
+					if !matched {
+						return
+					}
+				}
+
 				data, _ := json.Marshal(msg)
 				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 					cancel()

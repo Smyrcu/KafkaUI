@@ -5,6 +5,29 @@ server:
 auth:
   enabled: false
 
+# Basic auth example:
+# auth:
+#   enabled: true
+#   type: basic
+#   basic:
+#     users:
+#       - username: admin
+#         password: "$2a$10$..."   # bcrypt hash, generate with: htpasswd -nbBC 10 "" yourpassword | cut -d: -f2
+#         roles: [admin]
+#       - username: viewer
+#         password: "$2a$10$..."
+#         roles: [viewer]
+#   session:
+#     secret: "${SESSION_SECRET}"  # set via environment variable
+#     max-age: 86400               # 24 hours
+#   rbac:
+#     - role: admin
+#       clusters: ["*"]
+#       actions: ["*"]
+#     - role: viewer
+#       clusters: ["*"]
+#       actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
+
 clusters:
   - name: local
     bootstrap-servers: localhost:9092

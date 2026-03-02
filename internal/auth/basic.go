@@ -1,0 +1,45 @@
+package auth
+
+import (
+	"fmt"
+
+	"github.com/Smyrcu/KafkaUI/internal/config"
+	"golang.org/x/crypto/bcrypt"
+)
+
+// BasicAuthenticator validates username/password credentials against
+// a list of users with bcrypt-hashed passwords from the config.
+type BasicAuthenticator struct {
+	users map[string]config.BasicUser
+}
+
+// NewBasicAuthenticator creates a new BasicAuthenticator from the given user list.
+func NewBasicAuthenticator(users []config.BasicUser) *BasicAuthenticator {
+	m := make(map[string]config.BasicUser, len(users))
+	for _, u := range users {
+		m[u.Username] = u
+	}
+	return &BasicAuthenticator{users: m}
+}
+
+// Authenticate checks username/password against configured users.
+// Returns SessionData on success or an error on failure.
+// The error message is intentionally generic to prevent user enumeration.
+func (a *BasicAuthenticator) Authenticate(username, password string) (*SessionData, error) {
+	user, ok := a.users[username]
+	if !ok {
+		// Spend time on bcrypt to prevent timing attacks
+		bcrypt.CompareHashAndPassword([]byte("$2a$10$000000000000000000000uAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"), []byte(password))
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	return &SessionData{
+		Email: user.Username,
+		Name:  user.Username,
+		Roles: user.Roles,
+	}, nil
+}
