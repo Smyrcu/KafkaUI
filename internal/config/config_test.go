@@ -291,6 +291,49 @@ clusters:
 	}
 }
 
+func TestLoad_BasicAuthConfig(t *testing.T) {
+	yaml := `
+auth:
+  enabled: true
+  type: basic
+  basic:
+    users:
+      - username: admin
+        password: "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ12"
+        roles: [admin]
+      - username: viewer
+        password: "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ12"
+        roles: [viewer]
+  rbac:
+    - role: admin
+      clusters: ["*"]
+      actions: ["*"]
+clusters:
+  - name: test
+    bootstrap-servers: localhost:9092
+`
+	path := writeTempFile(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.Auth.Enabled {
+		t.Error("expected auth enabled")
+	}
+	if cfg.Auth.Type != "basic" {
+		t.Errorf("expected auth type 'basic', got %q", cfg.Auth.Type)
+	}
+	if len(cfg.Auth.Basic.Users) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(cfg.Auth.Basic.Users))
+	}
+	if cfg.Auth.Basic.Users[0].Username != "admin" {
+		t.Errorf("expected username 'admin', got %q", cfg.Auth.Basic.Users[0].Username)
+	}
+	if len(cfg.Auth.Basic.Users[0].Roles) != 1 || cfg.Auth.Basic.Users[0].Roles[0] != "admin" {
+		t.Errorf("expected roles [admin], got %v", cfg.Auth.Basic.Users[0].Roles)
+	}
+}
+
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
