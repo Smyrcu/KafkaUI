@@ -14,7 +14,7 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
-import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
+import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter } from "lucide-react";
 
 type OffsetMode = "latest" | "earliest" | "timestamp" | "custom";
 
@@ -28,7 +28,9 @@ export function TopicMessagesPage() {
   const [timestamp, setTimestamp] = useState("");
   const [limit, setLimit] = useState(100);
   const [browseParams, setBrowseParams] = useState<BrowseParams | null>(null);
+  const [fetchNonce, setFetchNonce] = useState(0);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [celFilter, setCelFilter] = useState("");
 
   // Live tail
   const wsUrl = clusterName && topicName
@@ -44,7 +46,7 @@ export function TopicMessagesPage() {
 
   // Fetch messages
   const { data: fetchedMessages, isLoading, error } = useQuery({
-    queryKey: ["messages", clusterName, topicName, browseParams],
+    queryKey: ["messages", clusterName, topicName, browseParams, fetchNonce],
     queryFn: () => api.messages.browse(clusterName!, topicName!, browseParams!),
     enabled: !!clusterName && !!topicName && !!browseParams && !isLiveTail,
   });
@@ -67,7 +69,9 @@ export function TopicMessagesPage() {
       case "custom": params.offset = customOffset; break;
       case "timestamp": params.timestamp = new Date(timestamp).toISOString(); break;
     }
+    if (celFilter) params.filter = celFilter;
     setBrowseParams({ ...params });
+    setFetchNonce((n) => n + 1);
   };
 
   const handleProduce = () => {
@@ -84,7 +88,7 @@ export function TopicMessagesPage() {
       disconnect();
     } else {
       setBrowseParams(null);
-      connect();
+      connect(celFilter || undefined);
     }
   };
 
@@ -201,6 +205,26 @@ export function TopicMessagesPage() {
             </DialogContent>
           </Dialog>
         </div>
+      </div>
+
+      {/* CEL Filter */}
+      <div className="flex flex-col gap-1.5 mb-4">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs flex items-center gap-1 shrink-0"><Filter className="h-3 w-3" />CEL Filter</Label>
+          <Input
+            className="font-mono text-sm"
+            placeholder='value.status == "ERROR" && key.contains("order")'
+            value={celFilter}
+            onChange={(e) => setCelFilter(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !isLiveTail) handleFetch(); }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground ml-[4.5rem]">
+          Fields: <code className="bg-muted px-1 rounded">key</code> <code className="bg-muted px-1 rounded">value</code> <code className="bg-muted px-1 rounded">headers</code> <code className="bg-muted px-1 rounded">partition</code> <code className="bg-muted px-1 rounded">offset</code> <code className="bg-muted px-1 rounded">timestamp</code>
+          {" · "}JSON values: <code className="bg-muted px-1 rounded">value.field == "x"</code>
+          {" · "}String: <code className="bg-muted px-1 rounded">key.contains("order")</code>
+          {" · "}Combine: <code className="bg-muted px-1 rounded">value.amount &gt; 100 && headers.source == "payments"</code>
+        </p>
       </div>
 
       {/* Connection indicator */}
