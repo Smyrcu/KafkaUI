@@ -10,7 +10,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=frontend /app/frontend/dist ./frontend/dist
+COPY --from=frontend /app/frontend/dist ./internal/frontend/dist
 RUN CGO_ENABLED=0 go build -o kafkaui ./cmd/kafkaui
 
 FROM alpine:3.21
