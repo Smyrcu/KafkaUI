@@ -16,7 +16,7 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authType string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -42,61 +42,69 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
-	authHandler := handlers.NewAuthHandler(authProvider, sessions, authEnabled)
+	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, authEnabled, authType)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
 		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)
 
+		// Auth endpoints — no auth middleware (must be accessible unauthenticated)
 		r.Get("/auth/status", authHandler.Status)
-		r.Get("/auth/login", authHandler.Login)
+		r.Post("/auth/login", authHandler.LoginBasic)
+		r.Get("/auth/login", authHandler.LoginOIDC)
 		r.Get("/auth/callback", authHandler.Callback)
 		r.Get("/auth/me", authHandler.Me)
 		r.Post("/auth/logout", authHandler.Logout)
 
-		r.Get("/dashboard", dashboardHandler.Overview)
-		r.Get("/clusters", clusterHandler.List)
+		// Protected API routes
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Auth(sessions, authEnabled))
 
-		r.Route("/clusters/{clusterName}", func(r chi.Router) {
-			r.Get("/overview", dashboardHandler.ClusterOverviewDetail)
-			r.Get("/brokers", brokerHandler.List)
+			r.Get("/dashboard", dashboardHandler.Overview)
+			r.Get("/clusters", clusterHandler.List)
 
-			r.Get("/topics", topicHandler.List)
-			r.Post("/topics", topicHandler.Create)
-			r.Get("/topics/{topicName}", topicHandler.Details)
-			r.Delete("/topics/{topicName}", topicHandler.Delete)
+			r.Route("/clusters/{clusterName}", func(r chi.Router) {
+				r.Get("/overview", dashboardHandler.ClusterOverviewDetail)
+				r.Get("/brokers", brokerHandler.List)
 
-			r.Get("/topics/{topicName}/messages", messageHandler.Browse)
-			r.Post("/topics/{topicName}/messages", messageHandler.Produce)
+				r.Get("/topics", topicHandler.List)
+				r.Post("/topics", topicHandler.Create)
+				r.Get("/topics/{topicName}", topicHandler.Details)
+				r.Delete("/topics/{topicName}", topicHandler.Delete)
 
-			r.Get("/consumer-groups", consumerGroupHandler.List)
-			r.Get("/consumer-groups/{groupName}", consumerGroupHandler.Details)
-			r.Post("/consumer-groups/{groupName}/reset", consumerGroupHandler.ResetOffsets)
+				r.Get("/topics/{topicName}/messages", messageHandler.Browse)
+				r.Post("/topics/{topicName}/messages", messageHandler.Produce)
 
-			r.Get("/schemas", schemaHandler.List)
-			r.Post("/schemas", schemaHandler.Create)
-			r.Get("/schemas/{subject}", schemaHandler.Details)
-			r.Delete("/schemas/{subject}", schemaHandler.Delete)
+				r.Get("/consumer-groups", consumerGroupHandler.List)
+				r.Get("/consumer-groups/{groupName}", consumerGroupHandler.Details)
+				r.Post("/consumer-groups/{groupName}/reset", consumerGroupHandler.ResetOffsets)
 
-			r.Get("/connectors", connectHandler.List)
-			r.Post("/connectors", connectHandler.Create)
-			r.Get("/connectors/{connectorName}", connectHandler.Details)
-			r.Put("/connectors/{connectorName}", connectHandler.Update)
-			r.Delete("/connectors/{connectorName}", connectHandler.Delete)
-			r.Post("/connectors/{connectorName}/restart", connectHandler.Restart)
-			r.Post("/connectors/{connectorName}/pause", connectHandler.Pause)
-			r.Post("/connectors/{connectorName}/resume", connectHandler.Resume)
+				r.Get("/schemas", schemaHandler.List)
+				r.Post("/schemas", schemaHandler.Create)
+				r.Get("/schemas/{subject}", schemaHandler.Details)
+				r.Delete("/schemas/{subject}", schemaHandler.Delete)
 
-			r.Post("/ksql", ksqlHandler.Execute)
-			r.Get("/ksql/info", ksqlHandler.Info)
+				r.Get("/connectors", connectHandler.List)
+				r.Post("/connectors", connectHandler.Create)
+				r.Get("/connectors/{connectorName}", connectHandler.Details)
+				r.Put("/connectors/{connectorName}", connectHandler.Update)
+				r.Delete("/connectors/{connectorName}", connectHandler.Delete)
+				r.Post("/connectors/{connectorName}/restart", connectHandler.Restart)
+				r.Post("/connectors/{connectorName}/pause", connectHandler.Pause)
+				r.Post("/connectors/{connectorName}/resume", connectHandler.Resume)
 
-			r.Get("/acls", aclHandler.List)
-			r.Post("/acls", aclHandler.Create)
-			r.Post("/acls/delete", aclHandler.Delete)
+				r.Post("/ksql", ksqlHandler.Execute)
+				r.Get("/ksql/info", ksqlHandler.Info)
+
+				r.Get("/acls", aclHandler.List)
+				r.Post("/acls", aclHandler.Create)
+				r.Post("/acls/delete", aclHandler.Delete)
+			})
 		})
 	})
 
 	r.Route("/ws", func(r chi.Router) {
+		r.Use(middleware.Auth(sessions, authEnabled))
 		r.Get("/clusters/{clusterName}/topics/{topicName}/live", liveTailHandler.Handle)
 	})
 
