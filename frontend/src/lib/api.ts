@@ -6,6 +6,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      window.location.reload();
+      throw new Error('Unauthorized');
+    }
     const error = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(error.error || res.statusText);
   }
@@ -40,6 +44,7 @@ export interface BrowseParams {
   offset?: string;
   limit?: number;
   timestamp?: string;
+  filter?: string;
 }
 
 export interface ConsumerGroupInfo {
@@ -169,6 +174,23 @@ export interface ACLEntry {
   permission: string;
 }
 
+export interface AuthStatus {
+  enabled: boolean;
+  type: string;
+}
+
+export interface AuthUser {
+  authenticated: boolean;
+  email?: string;
+  name?: string;
+  roles?: string[];
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
 export const api = {
   dashboard: { overview: () => request<ClusterOverview[]>('/dashboard') },
   clusters: { list: () => request<ClusterInfo[]>('/clusters') },
@@ -186,6 +208,7 @@ export const api = {
       if (params?.offset) searchParams.set('offset', params.offset);
       if (params?.limit) searchParams.set('limit', String(params.limit));
       if (params?.timestamp) searchParams.set('timestamp', params.timestamp);
+      if (params?.filter) searchParams.set('filter', params.filter);
       const qs = searchParams.toString();
       return request<MessageRecord[]>(`/clusters/${cluster}/topics/${topic}/messages${qs ? `?${qs}` : ''}`);
     },
@@ -222,5 +245,11 @@ export const api = {
     list: (cluster: string) => request<ACLEntry[]>(`/clusters/${cluster}/acls`),
     create: (cluster: string, data: ACLEntry) => request(`/clusters/${cluster}/acls`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (cluster: string, data: ACLEntry) => request(`/clusters/${cluster}/acls/delete`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  auth: {
+    status: () => request<AuthStatus>('/auth/status'),
+    me: () => request<AuthUser>('/auth/me'),
+    login: (data: LoginRequest) => request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+    logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
   },
 };

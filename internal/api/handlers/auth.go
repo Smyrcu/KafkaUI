@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -10,18 +11,75 @@ import (
 )
 
 type AuthHandler struct {
-	provider *auth.Provider
-	sessions *auth.SessionManager
-	enabled  bool
+	provider    *auth.Provider
+	basic       *auth.BasicAuthenticator
+	rateLimiter *auth.LoginRateLimiter
+	sessions    *auth.SessionManager
+	enabled     bool
+	authType    string
 }
 
-func NewAuthHandler(provider *auth.Provider, sessions *auth.SessionManager, enabled bool) *AuthHandler {
-	return &AuthHandler{provider: provider, sessions: sessions, enabled: enabled}
+func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, enabled bool, authType string) *AuthHandler {
+	return &AuthHandler{
+		provider:    provider,
+		basic:       basic,
+		rateLimiter: rateLimiter,
+		sessions:    sessions,
+		enabled:     enabled,
+		authType:    authType,
+	}
 }
 
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled {
-		writeError(w, http.StatusNotFound, "auth not enabled")
+func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
+	if !h.enabled || h.authType != "basic" {
+		writeError(w, http.StatusNotFound, "basic auth not enabled")
+		return
+	}
+
+	ip := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		ip = fwd
+	}
+	if !h.rateLimiter.Allow(ip) {
+		writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
+		return
+	}
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "username and password required")
+		return
+	}
+
+	session, err := h.basic.Authenticate(req.Username, req.Password)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
+	if err := h.sessions.CreateSession(w, r, *session); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create session")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"authenticated": true,
+		"name":          session.Name,
+		"roles":         session.Roles,
+	})
+}
+
+func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
+	if !h.enabled || h.authType != "oidc" {
+		writeError(w, http.StatusNotFound, "oidc auth not enabled")
 		return
 	}
 
@@ -41,8 +99,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled {
-		writeError(w, http.StatusNotFound, "auth not enabled")
+	if !h.enabled || h.authType != "oidc" {
+		writeError(w, http.StatusNotFound, "oidc auth not enabled")
 		return
 	}
 
@@ -65,7 +123,6 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear the oauth_state cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    "",
@@ -90,11 +147,9 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Redirect to the original URL if set, otherwise "/"
 	redirectURI := "/"
 	if redirectCookie, err := r.Cookie("redirect_uri"); err == nil && redirectCookie.Value != "" {
 		redirectURI = redirectCookie.Value
-		// Clear the redirect_uri cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     "redirect_uri",
 			Value:    "",
@@ -139,7 +194,7 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 	authType := "none"
 	if h.enabled {
-		authType = "oidc"
+		authType = h.authType
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

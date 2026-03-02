@@ -66,7 +66,21 @@ func main() {
 		logger.Info("OIDC authentication enabled", "issuer", cfg.Auth.OIDC.Issuer)
 	}
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider)
+	// Create basic authenticator if auth is enabled and type is basic
+	var basicAuth *auth.BasicAuthenticator
+	var rateLimiter *auth.LoginRateLimiter
+	if cfg.Auth.Enabled && cfg.Auth.Type == "basic" {
+		basicAuth = auth.NewBasicAuthenticator(cfg.Auth.Basic.Users)
+		rateLimiter = auth.NewLoginRateLimiter(5, time.Minute)
+		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
+	}
+
+	authType := ""
+	if cfg.Auth.Enabled {
+		authType = cfg.Auth.Type
+	}
+
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider, basicAuth, rateLimiter, authType)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {
