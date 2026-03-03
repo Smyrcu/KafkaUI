@@ -6,17 +6,24 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
+	github.com/google/cel-go v0.27.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/twmb/franz-go v1.20.7
 	github.com/twmb/franz-go/pkg/kadm v1.17.2
 	github.com/twmb/franz-go/pkg/kmsg v1.12.0
+	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.35.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	cel.dev/expr v0.25.1 // indirect
+	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.25 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240826202546-f6391c0de4c7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )

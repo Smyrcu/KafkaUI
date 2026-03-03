@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	celfilter "github.com/Smyrcu/KafkaUI/internal/cel"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
@@ -81,6 +82,28 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 		req.Timestamp = &ts
 	}
 
+	// Compile CEL filter if provided.
+	var filter *celfilter.Filter
+	filterExpr := r.URL.Query().Get("filter")
+	if filterExpr != "" {
+		var err error
+		filter, err = celfilter.NewFilter(filterExpr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
+	// When filtering, over-fetch from Kafka since some messages will be
+	// discarded. Save the original requested limit for the final result.
+	originalLimit := req.Limit
+	if filter != nil {
+		req.Limit = originalLimit * 5
+		if req.Limit > 2500 {
+			req.Limit = 2500
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -94,6 +117,21 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 		for i := range messages {
 			messages[i].Value = h.maskingEngine.MaskMessage(topicName, messages[i].Value)
 		}
+	}
+
+	// Apply CEL filter after masking.
+	if filter != nil {
+		filtered := make([]kafka.MessageRecord, 0, originalLimit)
+		for _, msg := range messages {
+			match, _ := filter.Match(msg)
+			if match {
+				filtered = append(filtered, msg)
+				if len(filtered) >= originalLimit {
+					break
+				}
+			}
+		}
+		messages = filtered
 	}
 
 	writeJSON(w, http.StatusOK, messages)

@@ -22,6 +22,9 @@ Thumbs.db
 config.yaml
 !config.example.yaml
 
+# Design plans (may contain internal notes)
+docs/plans/
+
 # Environment
 .env
 .env.*
