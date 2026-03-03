@@ -115,8 +115,11 @@ auth:
       - username: viewer
         password: "$2a$10$..."
         roles: [viewer]
+    rate-limit:
+      max-attempts: 5     # per IP (default: 5)
+      window-seconds: 60  # default: 60
   session:
-    secret: ${SESSION_SECRET}
+    secret: ${SESSION_SECRET}  # REQUIRED — generate with: openssl rand -base64 32
     max-age: 86400
   rbac:
     - role: admin
@@ -178,4 +181,4 @@ All API routes are under `/api/v1/`. WebSocket endpoints are under `/ws/`.
 
 ## License
 
-[GNU General Public License v2.0](LICENSE)
+[GNU General Public License v3.0](LICENSE)
