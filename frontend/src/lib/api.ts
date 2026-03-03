@@ -44,6 +44,7 @@ export interface BrowseParams {
   offset?: string;
   limit?: number;
   timestamp?: string;
+  filter?: string;
 }
 
 export interface ConsumerGroupInfo {
@@ -207,6 +208,7 @@ export const api = {
       if (params?.offset) searchParams.set('offset', params.offset);
       if (params?.limit) searchParams.set('limit', String(params.limit));
       if (params?.timestamp) searchParams.set('timestamp', params.timestamp);
+      if (params?.filter) searchParams.set('filter', params.filter);
       const qs = searchParams.toString();
       return request<MessageRecord[]>(`/clusters/${cluster}/topics/${topic}/messages${qs ? `?${qs}` : ''}`);
     },

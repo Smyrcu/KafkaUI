@@ -8,12 +8,13 @@ export function useWebSocket(url: string | null) {
   const [state, setState] = useState<ConnectionState>('disconnected');
   const wsRef = useRef<WebSocket | null>(null);
 
-  const connect = useCallback(() => {
+  const connect = useCallback((filter?: string) => {
     if (!url || wsRef.current) return;
 
     setState('connecting');
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}${url}`;
+    const filterQs = filter ? `?filter=${encodeURIComponent(filter)}` : '';
+    const wsUrl = `${protocol}//${window.location.host}${url}${filterQs}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

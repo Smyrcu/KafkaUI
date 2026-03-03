@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -317,17 +318,44 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 	}
 
 	topicOffsets := make(map[int32]kgo.Offset)
-	for _, p := range t.Partitions.Sorted() {
-		if req.Partition != nil && p.Partition != *req.Partition {
-			continue
+
+	// For "latest" (-1), fetch high watermarks and start limit messages before the end.
+	if req.Offset == -1 {
+		endOffsets, err := c.admin.ListEndOffsets(ctx, topic)
+		if err != nil {
+			return nil, fmt.Errorf("listing end offsets: %w", err)
 		}
-		switch req.Offset {
-		case -1:
-			topicOffsets[p.Partition] = kgo.NewOffset().AtEnd()
-		case -2:
-			topicOffsets[p.Partition] = kgo.NewOffset().AtStart()
-		default:
-			topicOffsets[p.Partition] = kgo.NewOffset().At(req.Offset)
+		startOffsets, err := c.admin.ListStartOffsets(ctx, topic)
+		if err != nil {
+			return nil, fmt.Errorf("listing start offsets: %w", err)
+		}
+		endOffsets.Each(func(eo kadm.ListedOffset) {
+			if req.Partition != nil && eo.Partition != *req.Partition {
+				return
+			}
+			start := eo.Offset - int64(req.Limit)
+			// Don't go before the partition's start offset.
+			startOffsets.Each(func(so kadm.ListedOffset) {
+				if so.Partition == eo.Partition && start < so.Offset {
+					start = so.Offset
+				}
+			})
+			if start < 0 {
+				start = 0
+			}
+			topicOffsets[eo.Partition] = kgo.NewOffset().At(start)
+		})
+	} else {
+		for _, p := range t.Partitions.Sorted() {
+			if req.Partition != nil && p.Partition != *req.Partition {
+				continue
+			}
+			switch req.Offset {
+			case -2:
+				topicOffsets[p.Partition] = kgo.NewOffset().AtStart()
+			default:
+				topicOffsets[p.Partition] = kgo.NewOffset().At(req.Offset)
+			}
 		}
 	}
 
@@ -366,16 +394,20 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 
 	var records []MessageRecord
 	for len(records) < req.Limit {
-		fetches := consumer.PollFetches(ctx)
+		pollCtx, pollCancel := context.WithTimeout(ctx, 2*time.Second)
+		fetches := consumer.PollFetches(pollCtx)
+		pollCancel()
 		if ctx.Err() != nil {
 			break
 		}
 		if errs := fetches.Errors(); len(errs) > 0 {
-			if ctx.Err() != nil {
+			// Ignore poll timeout errors — they just mean no new data yet.
+			if ctx.Err() != nil || errors.Is(errs[0].Err, context.DeadlineExceeded) {
 				break
 			}
 			return records, fmt.Errorf("consuming: %v", errs[0].Err)
 		}
+		countBefore := len(records)
 		fetches.EachRecord(func(r *kgo.Record) {
 			if len(records) >= req.Limit {
 				return
@@ -393,6 +425,10 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 				Headers:   headers,
 			})
 		})
+		// No new messages — topic exhausted, stop waiting.
+		if len(records) == countBefore {
+			break
+		}
 	}
 
 	return records, nil
