@@ -17,6 +17,9 @@ auth:
 #       - username: viewer
 #         password: "$2a$10$..."
 #         roles: [viewer]
+#   rate-limit:
+#     max-attempts: 5              # max failed logins per IP (default: 5)
+#     window-seconds: 60           # rate limit window in seconds (default: 60)
 #   session:
 #     secret: "${SESSION_SECRET}"  # set via environment variable
 #     max-age: 86400               # 24 hours

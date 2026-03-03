@@ -44,7 +44,13 @@ type AuthConfig struct {
 }
 
 type BasicAuthConfig struct {
-	Users []BasicUser `yaml:"users"`
+	Users     []BasicUser     `yaml:"users"`
+	RateLimit RateLimitConfig `yaml:"rate-limit"`
+}
+
+type RateLimitConfig struct {
+	MaxAttempts   int `yaml:"max-attempts"`
+	WindowSeconds int `yaml:"window-seconds"`
 }
 
 type BasicUser struct {

@@ -26,7 +26,6 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
-		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
@@ -42,7 +41,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
-	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, authEnabled, authType)
+	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, logger, authEnabled, authType)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
