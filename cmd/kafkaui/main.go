@@ -44,6 +44,9 @@ func main() {
 	sessionSecret := cfg.Auth.Session.Secret
 	if sessionSecret == "" {
 		sessionSecret = "kafkaui-default-secret-change-me"
+		if cfg.Auth.Enabled {
+			logger.Warn("auth is enabled but no session secret configured — using insecure default. Set auth.session.secret or SESSION_SECRET env var")
+		}
 	}
 	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
 
@@ -71,7 +74,17 @@ func main() {
 	var rateLimiter *auth.LoginRateLimiter
 	if cfg.Auth.Enabled && cfg.Auth.Type == "basic" {
 		basicAuth = auth.NewBasicAuthenticator(cfg.Auth.Basic.Users)
-		rateLimiter = auth.NewLoginRateLimiter(5, time.Minute)
+
+		maxAttempts := cfg.Auth.Basic.RateLimit.MaxAttempts
+		if maxAttempts == 0 {
+			maxAttempts = 5
+		}
+		windowSecs := cfg.Auth.Basic.RateLimit.WindowSeconds
+		if windowSecs == 0 {
+			windowSecs = 60
+		}
+		rateLimiter = auth.NewLoginRateLimiter(maxAttempts, time.Duration(windowSecs)*time.Second)
+
 		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
 	}
 

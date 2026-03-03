@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,16 +16,18 @@ type AuthHandler struct {
 	basic       *auth.BasicAuthenticator
 	rateLimiter *auth.LoginRateLimiter
 	sessions    *auth.SessionManager
+	logger      *slog.Logger
 	enabled     bool
 	authType    string
 }
 
-func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, enabled bool, authType string) *AuthHandler {
+func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authType string) *AuthHandler {
 	return &AuthHandler{
 		provider:    provider,
 		basic:       basic,
 		rateLimiter: rateLimiter,
 		sessions:    sessions,
+		logger:      logger,
 		enabled:     enabled,
 		authType:    authType,
 	}
@@ -41,6 +44,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		ip = fwd
 	}
 	if !h.rateLimiter.Allow(ip) {
+		h.logger.Warn("login rate limited", "ip", ip)
 		writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
 		return
 	}
@@ -61,6 +65,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.basic.Authenticate(req.Username, req.Password)
 	if err != nil {
+		h.logger.Warn("login failed", "username", req.Username, "ip", ip)
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -70,6 +75,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Info("login successful", "username", req.Username, "ip", ip)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
 		"name":          session.Name,
@@ -163,6 +169,9 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if session, err := h.sessions.GetSession(r); err == nil {
+		h.logger.Info("logout", "name", session.Name)
+	}
 	h.sessions.ClearSession(w, r)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "logged out"})
 }
