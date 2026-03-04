@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Frontend build artifacts (rebuilt in Docker)
+frontend/node_modules/
+frontend/dist/
+
+# Embedded frontend placeholder
+internal/frontend/dist/.gitkeep
+
+# Config with secrets
+config.yaml
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/kafkaui
+*.log
