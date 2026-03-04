@@ -38,6 +38,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	connectHandler := handlers.NewConnectHandler(registry)
 	ksqlHandler := handlers.NewKsqlHandler(registry)
 	aclHandler := handlers.NewACLHandler(registry)
+	userHandler := handlers.NewUserHandler(registry)
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
@@ -98,6 +99,10 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 				r.Get("/acls", aclHandler.List)
 				r.Post("/acls", aclHandler.Create)
 				r.Post("/acls/delete", aclHandler.Delete)
+
+				r.Get("/users", userHandler.List)
+				r.Post("/users", userHandler.Create)
+				r.Post("/users/delete", userHandler.Delete)
 			})
 		})
 	})

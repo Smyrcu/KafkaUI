@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   Shield,
+  UserCog,
   PlugZap,
   Terminal,
   BookOpen,
@@ -35,6 +36,7 @@ const clusterNavItems = [
   { label: "Kafka Connect", icon: PlugZap, path: "connect" },
   { label: "KSQL", icon: Terminal, path: "ksql" },
   { label: "ACL", icon: Shield, path: "acl" },
+  { label: "Users", icon: UserCog, path: "users" },
 ];
 
 export function AppSidebar() {
