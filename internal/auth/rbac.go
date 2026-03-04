@@ -19,6 +19,8 @@ const (
 	ActionExecuteKSQL        = "execute_ksql"
 	ActionViewACLs           = "view_acls"
 	ActionManageACLs         = "manage_acls"
+	ActionViewUsers          = "view_users"
+	ActionManageUsers        = "manage_users"
 )
 
 type RBAC struct {

@@ -174,6 +174,24 @@ export interface ACLEntry {
   permission: string;
 }
 
+export interface ScramUser {
+  name: string;
+  mechanism: string;
+  iterations: number;
+}
+
+export interface UpsertScramUserRequest {
+  name: string;
+  password: string;
+  mechanism: string;
+  iterations?: number;
+}
+
+export interface DeleteScramUserRequest {
+  name: string;
+  mechanism: string;
+}
+
 export interface AuthStatus {
   enabled: boolean;
   type: string;
@@ -245,6 +263,13 @@ export const api = {
     list: (cluster: string) => request<ACLEntry[]>(`/clusters/${cluster}/acls`),
     create: (cluster: string, data: ACLEntry) => request(`/clusters/${cluster}/acls`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (cluster: string, data: ACLEntry) => request(`/clusters/${cluster}/acls/delete`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  users: {
+    list: (cluster: string) => request<ScramUser[]>(`/clusters/${cluster}/users`),
+    create: (cluster: string, data: UpsertScramUserRequest) =>
+      request<{ status: string }>(`/clusters/${cluster}/users`, { method: 'POST', body: JSON.stringify(data) }),
+    delete: (cluster: string, data: DeleteScramUserRequest) =>
+      request<{ status: string }>(`/clusters/${cluster}/users/delete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   auth: {
     status: () => request<AuthStatus>('/auth/status'),
