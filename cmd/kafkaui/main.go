@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,43 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
+
+// spaHandler serves static files and falls back to index.html for client-side routes.
+type spaHandler struct {
+	fs       http.FileSystem
+	fallback []byte
+}
+
+func newSPAHandler(fsys http.FileSystem) *spaHandler {
+	index, err := fsys.Open("index.html")
+	if err != nil {
+		panic("frontend dist missing index.html: " + err.Error())
+	}
+	defer index.Close()
+	data, err := io.ReadAll(index)
+	if err != nil {
+		panic("reading index.html: " + err.Error())
+	}
+	return &spaHandler{fs: fsys, fallback: data}
+}
+
+func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	if path == "/" {
+		path = "/index.html"
+	}
+
+	f, err := h.fs.Open(path)
+	if err != nil {
+		// File not found — serve index.html for SPA routing
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(h.fallback)
+		return
+	}
+	f.Close()
+
+	http.FileServer(h.fs).ServeHTTP(w, r)
+}
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
@@ -100,12 +138,12 @@ func main() {
 		logger.Error("failed to create frontend filesystem", "error", err)
 		os.Exit(1)
 	}
-	fileServer := http.FileServer(http.FS(frontendContent))
+	spaHandler := newSPAHandler(http.FS(frontendContent))
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", router)
 	mux.Handle("/ws/", router)
-	mux.Handle("/", fileServer)
+	mux.Handle("/", spaHandler)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	server := &http.Server{
