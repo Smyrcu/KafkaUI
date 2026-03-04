@@ -15,6 +15,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - Kafka Connect management (CRUD, pause/resume/restart connectors)
 - KSQL query execution with quick actions
 - ACL management (create, list, delete access control entries)
+- SCRAM user management (list, create, delete Kafka credentials)
 - Dashboard with cluster overview and auto-refresh
 - Authentication: SASL (PLAIN, SCRAM-SHA-256/512), TLS/SSL
 - Authentication: Basic (login/password) or OIDC, with RBAC
@@ -127,7 +128,7 @@ auth:
       actions: ["*"]
     - role: viewer
       clusters: [production]
-      actions: [view_topics, view_messages]
+      actions: [view_topics, view_messages, view_users]
 
 # Or OIDC auth
 # auth:
