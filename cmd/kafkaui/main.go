@@ -96,16 +96,21 @@ func main() {
 		logger.Info("data masking enabled", "rules", len(cfg.DataMasking.Rules))
 	}
 
-	// Create OIDC provider if auth types include "oidc"
-	var authProvider *auth.Provider
+	// Create OIDC providers if auth types include "oidc"
+	var oidcProviders map[string]*auth.Provider
+	var oidcProviderCfg []config.OIDCProvider
 	if cfg.Auth.Enabled && slices.Contains(cfg.Auth.Types, "oidc") {
-		var err error
-		authProvider, err = auth.NewProvider(context.Background(), cfg.Auth.OIDC)
-		if err != nil {
-			logger.Error("failed to create OIDC provider", "error", err)
-			os.Exit(1)
+		oidcProviders = make(map[string]*auth.Provider)
+		oidcProviderCfg = cfg.Auth.OIDC.Providers
+		for _, p := range cfg.Auth.OIDC.Providers {
+			provider, err := auth.NewProvider(context.Background(), p, cfg.Auth.OIDC.RedirectURL)
+			if err != nil {
+				logger.Error("failed to create OIDC provider", "name", p.Name, "error", err)
+				os.Exit(1)
+			}
+			oidcProviders[p.Name] = provider
+			logger.Info("OIDC provider enabled", "name", p.Name, "issuer", p.Issuer)
 		}
-		logger.Info("OIDC authentication enabled", "issuer", cfg.Auth.OIDC.Issuer)
 	}
 
 	// Create basic authenticator if auth types include "basic"
@@ -127,7 +132,7 @@ func main() {
 		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
 	}
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider, basicAuth, rateLimiter, cfg.Auth.Types)
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {

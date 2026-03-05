@@ -12,11 +12,12 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/api/ws"
 	"github.com/Smyrcu/KafkaUI/internal/auth"
+	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -42,7 +43,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
-	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
+	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
@@ -51,7 +52,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 		// Auth endpoints — no auth middleware (must be accessible unauthenticated)
 		r.Get("/auth/status", authHandler.Status)
 		r.Post("/auth/login", authHandler.LoginBasic)
-		r.Get("/auth/login", authHandler.LoginOIDC)
+		r.Get("/auth/login/{provider}", authHandler.LoginOIDC)
 		r.Get("/auth/callback", authHandler.Callback)
 		r.Get("/auth/me", authHandler.Me)
 		r.Post("/auth/logout", authHandler.Logout)
