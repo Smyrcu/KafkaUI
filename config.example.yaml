@@ -8,7 +8,7 @@ auth:
 # Basic auth example:
 # auth:
 #   enabled: true
-#   type: basic
+#   types: [basic]
 #   basic:
 #     users:
 #       - username: admin
@@ -17,9 +17,9 @@ auth:
 #       - username: viewer
 #         password: "$2a$10$..."
 #         roles: [viewer]
-#   rate-limit:
-#     max-attempts: 5              # max failed logins per IP (default: 5)
-#     window-seconds: 60           # rate limit window in seconds (default: 60)
+#     rate-limit:
+#       max-attempts: 5              # max failed logins per IP (default: 5)
+#       window-seconds: 60           # rate limit window in seconds (default: 60)
 #   session:
 #     secret: "${SESSION_SECRET}"  # set via environment variable
 #     max-age: 86400               # 24 hours
@@ -30,6 +30,36 @@ auth:
 #     - role: viewer
 #       clusters: ["*"]
 #       actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
+
+# OIDC (Google) auth example:
+# auth:
+#   enabled: true
+#   types: [oidc]
+#   oidc:
+#     issuer: "https://accounts.google.com"
+#     client-id: "${GOOGLE_CLIENT_ID}"
+#     client-secret: "${GOOGLE_CLIENT_SECRET}"
+#     redirect-url: "http://localhost:8080/api/v1/auth/callback"
+#   session:
+#     secret: "${SESSION_SECRET}"
+#     max-age: 86400
+
+# Both basic + Google auth:
+# auth:
+#   enabled: true
+#   types: [basic, oidc]
+#   basic:
+#     users:
+#       - username: admin
+#         password: "$2a$10$..."
+#         roles: [admin]
+#   oidc:
+#     issuer: "https://accounts.google.com"
+#     client-id: "${GOOGLE_CLIENT_ID}"
+#     client-secret: "${GOOGLE_CLIENT_SECRET}"
+#     redirect-url: "http://localhost:8080/api/v1/auth/callback"
+#   session:
+#     secret: "${SESSION_SECRET}"
 
 clusters:
   - name: local
