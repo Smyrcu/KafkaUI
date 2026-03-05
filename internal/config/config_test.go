@@ -178,6 +178,19 @@ func TestLoad_AuthConfig(t *testing.T) {
 auth:
   enabled: true
   types: [oidc]
+  oidc:
+    redirect-url: http://localhost:8080/api/v1/auth/callback
+    providers:
+      - name: google
+        issuer: https://accounts.google.com
+        client-id: test-id
+        client-secret: test-secret
+      - name: auth0
+        display-name: Auth0
+        issuer: https://test.auth0.com/
+        client-id: auth0-id
+        client-secret: auth0-secret
+        scopes: [openid, profile]
 clusters:
   - name: test
     bootstrap-servers: localhost:9092
@@ -192,6 +205,21 @@ clusters:
 	}
 	if len(cfg.Auth.Types) != 1 || cfg.Auth.Types[0] != "oidc" {
 		t.Errorf("expected auth types [oidc], got %v", cfg.Auth.Types)
+	}
+	if cfg.Auth.OIDC.RedirectURL != "http://localhost:8080/api/v1/auth/callback" {
+		t.Errorf("expected redirect URL, got %q", cfg.Auth.OIDC.RedirectURL)
+	}
+	if len(cfg.Auth.OIDC.Providers) != 2 {
+		t.Fatalf("expected 2 providers, got %d", len(cfg.Auth.OIDC.Providers))
+	}
+	if cfg.Auth.OIDC.Providers[0].Name != "google" {
+		t.Errorf("expected first provider 'google', got %q", cfg.Auth.OIDC.Providers[0].Name)
+	}
+	if cfg.Auth.OIDC.Providers[1].DisplayName != "Auth0" {
+		t.Errorf("expected display name 'Auth0', got %q", cfg.Auth.OIDC.Providers[1].DisplayName)
+	}
+	if len(cfg.Auth.OIDC.Providers[1].Scopes) != 2 {
+		t.Errorf("expected 2 scopes for auth0, got %v", cfg.Auth.OIDC.Providers[1].Scopes)
 	}
 }
 
