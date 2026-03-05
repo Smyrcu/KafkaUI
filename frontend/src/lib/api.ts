@@ -192,9 +192,15 @@ export interface DeleteScramUserRequest {
   mechanism: string;
 }
 
+export interface OIDCProviderInfo {
+  name: string;
+  displayName?: string;
+}
+
 export interface AuthStatus {
   enabled: boolean;
   types: string[];
+  providers?: OIDCProviderInfo[];
 }
 
 export interface AuthUser {

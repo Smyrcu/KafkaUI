@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Database } from "lucide-react";
+import { Database, ShieldCheck } from "lucide-react";
+import type { OIDCProviderInfo } from "@/lib/api";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -17,6 +18,15 @@ function GoogleIcon({ className }: { className?: string }) {
   );
 }
 
+function ProviderIcon({ name, className }: { name: string; className?: string }) {
+  if (name === "google") return <GoogleIcon className={className} />;
+  return <ShieldCheck className={className} />;
+}
+
+function providerLabel(provider: OIDCProviderInfo): string {
+  return `Continue with ${provider.displayName || provider.name.charAt(0).toUpperCase() + provider.name.slice(1)}`;
+}
+
 export function LoginPage() {
   const { login, status } = useAuth();
   const [username, setUsername] = useState("");
@@ -25,7 +35,8 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const hasBasic = status?.types?.includes("basic") ?? false;
-  const hasOidc = status?.types?.includes("oidc") ?? false;
+  const providers = status?.providers ?? [];
+  const hasOidc = providers.length > 0;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,10 +49,6 @@ export function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleGoogleLogin() {
-    window.location.href = "/api/v1/auth/login";
   }
 
   return (
@@ -60,16 +67,19 @@ export function LoginPage() {
             </div>
           )}
 
-          {hasOidc && (
+          {providers.map((provider) => (
             <Button
+              key={provider.name}
               variant="outline"
               className="w-full"
-              onClick={handleGoogleLogin}
+              onClick={() => {
+                window.location.href = `/api/v1/auth/login/${provider.name}`;
+              }}
             >
-              <GoogleIcon className="mr-2 h-4 w-4" />
-              Continue with Google
+              <ProviderIcon name={provider.name} className="mr-2 h-4 w-4" />
+              {providerLabel(provider)}
             </Button>
-          )}
+          ))}
 
           {hasBasic && hasOidc && (
             <div className="relative">
