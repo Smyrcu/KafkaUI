@@ -36,7 +36,7 @@ type ServerConfig struct {
 
 type AuthConfig struct {
 	Enabled bool            `yaml:"enabled"`
-	Type    string          `yaml:"type"` // "basic" or "oidc"
+	Types   []string        `yaml:"types"`
 	OIDC    OIDCConfig      `yaml:"oidc"`
 	Basic   BasicAuthConfig `yaml:"basic"`
 	Session SessionConfig   `yaml:"session"`
