@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
 func TestStatus_AuthDisabled(t *testing.T) {
@@ -82,6 +84,45 @@ func TestLoginBasic_NotEnabled(t *testing.T) {
 
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404 when basic not in types, got %d", rr.Code)
+	}
+}
+
+func TestStatus_MultiAuthWithProviders(t *testing.T) {
+	providerCfg := []config.OIDCProvider{
+		{Name: "google"},
+		{Name: "auth0", DisplayName: "Auth0"},
+	}
+	h := NewAuthHandler(nil, providerCfg, nil, nil, nil, nil, true, []string{"basic", "oidc"})
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
+	rr := httptest.NewRecorder()
+
+	h.Status(rr, req)
+
+	var resp map[string]any
+	json.NewDecoder(rr.Body).Decode(&resp)
+
+	types, ok := resp["types"].([]any)
+	if !ok || len(types) != 2 {
+		t.Fatalf("expected types=[basic,oidc], got %v", resp["types"])
+	}
+
+	providers, ok := resp["providers"].([]any)
+	if !ok || len(providers) != 2 {
+		t.Fatalf("expected 2 providers, got %v", resp["providers"])
+	}
+
+	p0 := providers[0].(map[string]any)
+	if p0["name"] != "google" {
+		t.Errorf("expected first provider 'google', got %v", p0["name"])
+	}
+
+	p1 := providers[1].(map[string]any)
+	if p1["name"] != "auth0" {
+		t.Errorf("expected second provider 'auth0', got %v", p1["name"])
+	}
+	if p1["displayName"] != "Auth0" {
+		t.Errorf("expected displayName 'Auth0', got %v", p1["displayName"])
 	}
 }
 
