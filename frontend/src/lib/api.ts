@@ -194,7 +194,7 @@ export interface DeleteScramUserRequest {
 
 export interface AuthStatus {
   enabled: boolean;
-  type: string;
+  types: string[];
 }
 
 export interface AuthUser {
