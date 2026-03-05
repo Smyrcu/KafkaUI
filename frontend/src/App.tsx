@@ -19,6 +19,7 @@ import { ConnectorDetailPage } from "@/pages/ConnectorDetailPage";
 import { KsqlPage } from "@/pages/KsqlPage";
 import { AclPage } from "@/pages/AclPage";
 import { UsersPage } from "@/pages/UsersPage";
+import { MetricsPage } from "@/pages/MetricsPage";
 import type { ReactNode } from "react";
 
 const queryClient = new QueryClient({
@@ -67,6 +68,7 @@ export default function App() {
                   <Route path="/clusters/:clusterName/ksql" element={<KsqlPage />} />
                   <Route path="/clusters/:clusterName/acl" element={<AclPage />} />
                   <Route path="/clusters/:clusterName/users" element={<UsersPage />} />
+                  <Route path="/clusters/:clusterName/metrics" element={<MetricsPage />} />
                 </Route>
               </Routes>
             </RequireAuth>

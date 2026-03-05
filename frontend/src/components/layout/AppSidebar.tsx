@@ -12,6 +12,7 @@ import {
   BookOpen,
   LayoutDashboard,
   Layers,
+  BarChart3,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -37,6 +38,7 @@ const clusterNavItems = [
   { label: "KSQL", icon: Terminal, path: "ksql" },
   { label: "ACL", icon: Shield, path: "acl" },
   { label: "Users", icon: UserCog, path: "users" },
+  { label: "Metrics", icon: BarChart3, path: "metrics" },
 ];
 
 export function AppSidebar() {
