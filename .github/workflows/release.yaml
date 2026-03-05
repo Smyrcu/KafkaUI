@@ -12,8 +12,18 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is on main
+        run: |
+          git branch --contains "$GITHUB_REF" | grep -q '\bmain\b' || {
+            echo "::error::Tag $GITHUB_REF_NAME is not on main branch. Skipping release."
+            exit 1
+          }
 
       - name: Extract version from tag
         id: version
