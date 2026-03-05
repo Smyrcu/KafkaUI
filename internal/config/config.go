@@ -92,6 +92,11 @@ type ClusterConfig struct {
 	SchemaRegistry   SchemaRegistryConfig `yaml:"schema-registry"`
 	KafkaConnect     []KafkaConnectConfig `yaml:"kafka-connect"`
 	KSQL             KSQLConfig           `yaml:"ksql"`
+	Metrics          MetricsConfig        `yaml:"metrics"`
+}
+
+type MetricsConfig struct {
+	URL string `yaml:"url"`
 }
 
 type TLSConfig struct {

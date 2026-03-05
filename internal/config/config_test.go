@@ -362,6 +362,24 @@ clusters:
 	}
 }
 
+func TestLoad_MetricsConfig(t *testing.T) {
+	yaml := `
+clusters:
+  - name: test
+    bootstrap-servers: localhost:9092
+    metrics:
+      url: "http://{host}:9404/metrics"
+`
+	path := writeTempFile(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Clusters[0].Metrics.URL != "http://{host}:9404/metrics" {
+		t.Errorf("expected metrics URL, got %q", cfg.Clusters[0].Metrics.URL)
+	}
+}
+
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
