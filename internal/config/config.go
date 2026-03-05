@@ -60,11 +60,17 @@ type BasicUser struct {
 }
 
 type OIDCConfig struct {
+	RedirectURL string         `yaml:"redirect-url"`
+	Providers   []OIDCProvider `yaml:"providers"`
+}
+
+type OIDCProvider struct {
+	Name         string   `yaml:"name"`
+	DisplayName  string   `yaml:"display-name"`
 	Issuer       string   `yaml:"issuer"`
 	ClientID     string   `yaml:"client-id"`
 	ClientSecret string   `yaml:"client-secret"`
 	Scopes       []string `yaml:"scopes"`
-	RedirectURL  string   `yaml:"redirect-url"`
 }
 
 type SessionConfig struct {
