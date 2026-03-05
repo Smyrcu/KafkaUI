@@ -304,7 +304,17 @@ export const api = {
       request<{ status: string }>(`/clusters/${cluster}/users/delete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   metrics: {
-    get: (cluster: string, range?: string) => request<MetricsResponse>(`/clusters/${cluster}/metrics${range ? `?range=${range}` : ''}`),
+    get: (cluster: string, range?: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) {
+        params.set('from', from);
+        if (to) params.set('to', to);
+      } else if (range) {
+        params.set('range', range);
+      }
+      const qs = params.toString();
+      return request<MetricsResponse>(`/clusters/${cluster}/metrics${qs ? `?${qs}` : ''}`);
+    },
   },
   auth: {
     status: () => request<AuthStatus>('/auth/status'),

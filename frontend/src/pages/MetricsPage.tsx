@@ -10,14 +10,21 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/PageSkeleton";
-import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown, WifiOff } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown, WifiOff, Calendar } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const TIME_RANGES = [
-  { label: "10m", value: "10m" },
+  { label: "1m", value: "1m" },
+  { label: "5m", value: "5m" },
+  { label: "15m", value: "15m" },
+  { label: "30m", value: "30m" },
   { label: "1h", value: "1h" },
+  { label: "3h", value: "3h" },
   { label: "6h", value: "6h" },
-  { label: "24h", value: "24h" },
+  { label: "12h", value: "12h" },
+  { label: "1d", value: "1d" },
+  { label: "3d", value: "3d" },
   { label: "7d", value: "7d" },
   { label: "14d", value: "14d" },
 ] as const;
@@ -43,13 +50,23 @@ function formatChartBytes(value: number): string {
 
 function formatTime(iso: string, range_: string): string {
   const d = new Date(iso);
-  if (range_ === "7d" || range_ === "14d") {
+  if (["3d", "7d", "14d"].includes(range_)) {
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   }
-  if (range_ === "24h" || range_ === "6h") {
+  if (["1d", "6h", "12h", "24h"].includes(range_)) {
     return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   }
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function effectiveRange(custom: { from: string; to: string } | null, preset: string): string {
+  if (!custom) return preset;
+  const ms = new Date(custom.to).getTime() - new Date(custom.from).getTime();
+  const hours = ms / 3600000;
+  if (hours >= 72) return "7d";
+  if (hours >= 24) return "1d";
+  if (hours >= 6) return "6h";
+  return "1h";
 }
 
 function toChartData(history: TimestampedMetrics[], range_: string) {
@@ -193,11 +210,18 @@ function BrokerSection({ broker, range_ }: { broker: BrokerMetricsInfo; range_: 
 export function MetricsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const [range_, setRange] = useState("1h");
+  const [customMode, setCustomMode] = useState(false);
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [appliedCustom, setAppliedCustom] = useState<{ from: string; to: string } | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["metrics", clusterName, range_],
-    queryFn: () => api.metrics.get(clusterName!, range_),
-    refetchInterval: 30000,
+    queryKey: ["metrics", clusterName, appliedCustom ? `custom:${appliedCustom.from}:${appliedCustom.to}` : range_],
+    queryFn: () =>
+      appliedCustom
+        ? api.metrics.get(clusterName!, undefined, appliedCustom.from, appliedCustom.to)
+        : api.metrics.get(clusterName!, range_),
+    refetchInterval: appliedCustom ? false : 30000,
   });
 
   if (isLoading) return <TableSkeleton rows={3} cols={4} />;
@@ -238,22 +262,68 @@ export function MetricsPage() {
         description="Broker metrics from Prometheus JMX Exporter (auto-refreshes every 30s)"
       />
 
-      <div className="flex gap-1 mb-4">
+      <div className="flex flex-wrap items-center gap-1 mb-4">
         {TIME_RANGES.map((r) => (
           <Button
             key={r.value}
-            variant={range_ === r.value ? "default" : "outline"}
+            variant={!appliedCustom && range_ === r.value ? "default" : "outline"}
             size="sm"
-            onClick={() => setRange(r.value)}
+            onClick={() => {
+              setRange(r.value);
+              setAppliedCustom(null);
+              setCustomMode(false);
+            }}
           >
             {r.label}
           </Button>
         ))}
+        <Button
+          variant={customMode || appliedCustom ? "default" : "outline"}
+          size="sm"
+          onClick={() => setCustomMode(!customMode)}
+        >
+          <Calendar className="h-3.5 w-3.5 mr-1" />
+          Custom
+        </Button>
       </div>
+
+      {customMode && (
+        <div className="flex items-end gap-2 mb-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">From</label>
+            <Input
+              type="datetime-local"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="w-48 h-8 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">To</label>
+            <Input
+              type="datetime-local"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="w-48 h-8 text-sm"
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={!customFrom}
+            onClick={() => {
+              const from = new Date(customFrom).toISOString();
+              const to = customTo ? new Date(customTo).toISOString() : new Date().toISOString();
+              setAppliedCustom({ from, to });
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {brokers.map((broker) => (
-          <BrokerSection key={broker.id} broker={broker} range_={range_} />
+          <BrokerSection key={broker.id} broker={broker} range_={effectiveRange(appliedCustom, range_)} />
         ))}
       </div>
     </div>

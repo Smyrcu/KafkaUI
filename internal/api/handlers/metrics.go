@@ -35,10 +35,18 @@ type MetricsResponse struct {
 }
 
 var rangeDurations = map[string]time.Duration{
+	"1m":  time.Minute,
+	"5m":  5 * time.Minute,
 	"10m": 10 * time.Minute,
+	"15m": 15 * time.Minute,
+	"30m": 30 * time.Minute,
 	"1h":  time.Hour,
+	"3h":  3 * time.Hour,
 	"6h":  6 * time.Hour,
+	"12h": 12 * time.Hour,
+	"1d":  24 * time.Hour,
 	"24h": 24 * time.Hour,
+	"3d":  3 * 24 * time.Hour,
 	"7d":  7 * 24 * time.Hour,
 	"14d": 14 * 24 * time.Hour,
 }
@@ -69,14 +77,42 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse time range
-	rangeParam := r.URL.Query().Get("range")
-	if rangeParam == "" {
-		rangeParam = "1h"
-	}
-	duration, ok := rangeDurations[rangeParam]
-	if !ok {
-		duration = time.Hour
+	// Parse time range: either preset "range" param or custom "from"/"to" timestamps
+	var duration time.Duration
+	fromParam := r.URL.Query().Get("from")
+	toParam := r.URL.Query().Get("to")
+
+	if fromParam != "" {
+		fromTime, err := time.Parse(time.RFC3339, fromParam)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid 'from' timestamp, use RFC3339 format")
+			return
+		}
+		toTime := time.Now()
+		if toParam != "" {
+			toTime, err = time.Parse(time.RFC3339, toParam)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid 'to' timestamp, use RFC3339 format")
+				return
+			}
+		}
+		duration = toTime.Sub(fromTime)
+		if duration <= 0 {
+			duration = time.Hour
+		}
+		if duration > 14*24*time.Hour {
+			duration = 14 * 24 * time.Hour
+		}
+	} else {
+		rangeParam := r.URL.Query().Get("range")
+		if rangeParam == "" {
+			rangeParam = "1h"
+		}
+		var found bool
+		duration, found = rangeDurations[rangeParam]
+		if !found {
+			duration = time.Hour
+		}
 	}
 
 	// Get latest metrics (live scrape) in parallel
