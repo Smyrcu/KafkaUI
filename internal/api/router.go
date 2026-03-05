@@ -15,9 +15,10 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
+	"github.com/Smyrcu/KafkaUI/internal/metrics"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string, metricsScrapers map[string]*metrics.Scraper) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -41,6 +42,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	aclHandler := handlers.NewACLHandler(registry)
 	userHandler := handlers.NewUserHandler(registry)
 	dashboardHandler := handlers.NewDashboardHandler(registry)
+	metricsHandler := handlers.NewMetricsHandler(registry, metricsScrapers)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
 	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
@@ -104,6 +106,8 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 				r.Get("/users", userHandler.List)
 				r.Post("/users", userHandler.Create)
 				r.Post("/users/delete", userHandler.Delete)
+
+				r.Get("/metrics", metricsHandler.Metrics)
 			})
 		})
 	})

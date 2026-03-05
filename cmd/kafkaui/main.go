@@ -20,6 +20,7 @@ import (
 	fe "github.com/Smyrcu/KafkaUI/internal/frontend"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
+	"github.com/Smyrcu/KafkaUI/internal/metrics"
 )
 
 // spaHandler serves static files and falls back to index.html for client-side routes.
@@ -132,7 +133,16 @@ func main() {
 		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
 	}
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types)
+	// Create metrics scrapers for clusters with metrics configured
+	metricsScrapers := make(map[string]*metrics.Scraper)
+	for _, cc := range cfg.Clusters {
+		if cc.Metrics.URL != "" {
+			metricsScrapers[cc.Name] = metrics.NewScraper(cc.Metrics.URL)
+			logger.Info("metrics scraper enabled", "cluster", cc.Name, "url", cc.Metrics.URL)
+		}
+	}
+
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types, metricsScrapers)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {
