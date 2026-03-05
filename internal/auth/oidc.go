@@ -27,29 +27,29 @@ type UserInfo struct {
 }
 
 // NewProvider creates a new OIDC authentication provider from the given
-// configuration. It discovers the issuer's endpoints and configures the
-// OAuth2 flow and token verifier.
-func NewProvider(ctx context.Context, cfg config.OIDCConfig) (*Provider, error) {
-	provider, err := oidc.NewProvider(ctx, cfg.Issuer)
+// per-provider configuration and shared redirect URL. It discovers the
+// issuer's endpoints and configures the OAuth2 flow and token verifier.
+func NewProvider(ctx context.Context, providerCfg config.OIDCProvider, redirectURL string) (*Provider, error) {
+	provider, err := oidc.NewProvider(ctx, providerCfg.Issuer)
 	if err != nil {
-		return nil, fmt.Errorf("creating OIDC provider for issuer %q: %w", cfg.Issuer, err)
+		return nil, fmt.Errorf("creating OIDC provider for issuer %q: %w", providerCfg.Issuer, err)
 	}
 
-	scopes := cfg.Scopes
+	scopes := providerCfg.Scopes
 	if len(scopes) == 0 {
 		scopes = []string{"openid", "profile", "email"}
 	}
 
 	oauth2Config := oauth2.Config{
-		ClientID:     cfg.ClientID,
-		ClientSecret: cfg.ClientSecret,
-		RedirectURL:  cfg.RedirectURL,
+		ClientID:     providerCfg.ClientID,
+		ClientSecret: providerCfg.ClientSecret,
+		RedirectURL:  redirectURL,
 		Scopes:       scopes,
 		Endpoint:     provider.Endpoint(),
 	}
 
 	verifier := provider.Verifier(&oidc.Config{
-		ClientID: cfg.ClientID,
+		ClientID: providerCfg.ClientID,
 	})
 
 	return &Provider{
