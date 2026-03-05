@@ -20,7 +20,7 @@ jobs:
 
       - name: Verify tag is on main
         run: |
-          git branch --contains "$GITHUB_REF" | grep -q '\bmain\b' || {
+          git merge-base --is-ancestor "$GITHUB_REF" origin/main || {
             echo "::error::Tag $GITHUB_REF_NAME is not on main branch. Skipping release."
             exit 1
           }
