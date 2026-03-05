@@ -177,7 +177,7 @@ func TestLoad_AuthConfig(t *testing.T) {
 	yaml := `
 auth:
   enabled: true
-  type: oidc
+  types: [oidc]
 clusters:
   - name: test
     bootstrap-servers: localhost:9092
@@ -190,8 +190,8 @@ clusters:
 	if !cfg.Auth.Enabled {
 		t.Error("expected auth enabled")
 	}
-	if cfg.Auth.Type != "oidc" {
-		t.Errorf("expected auth type 'oidc', got %q", cfg.Auth.Type)
+	if len(cfg.Auth.Types) != 1 || cfg.Auth.Types[0] != "oidc" {
+		t.Errorf("expected auth types [oidc], got %v", cfg.Auth.Types)
 	}
 }
 
@@ -295,7 +295,7 @@ func TestLoad_BasicAuthConfig(t *testing.T) {
 	yaml := `
 auth:
   enabled: true
-  type: basic
+  types: [basic]
   basic:
     users:
       - username: admin
@@ -320,8 +320,8 @@ clusters:
 	if !cfg.Auth.Enabled {
 		t.Error("expected auth enabled")
 	}
-	if cfg.Auth.Type != "basic" {
-		t.Errorf("expected auth type 'basic', got %q", cfg.Auth.Type)
+	if len(cfg.Auth.Types) != 1 || cfg.Auth.Types[0] != "basic" {
+		t.Errorf("expected auth types [basic], got %v", cfg.Auth.Types)
 	}
 	if len(cfg.Auth.Basic.Users) != 2 {
 		t.Fatalf("expected 2 users, got %d", len(cfg.Auth.Basic.Users))

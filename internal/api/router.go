@@ -16,7 +16,7 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authType string) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, authProvider *auth.Provider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -42,7 +42,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	dashboardHandler := handlers.NewDashboardHandler(registry)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
-	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, logger, authEnabled, authType)
+	authHandler := handlers.NewAuthHandler(authProvider, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)

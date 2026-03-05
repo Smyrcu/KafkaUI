@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
@@ -95,9 +96,9 @@ func main() {
 		logger.Info("data masking enabled", "rules", len(cfg.DataMasking.Rules))
 	}
 
-	// Create OIDC provider if auth is enabled and type is oidc
+	// Create OIDC provider if auth types include "oidc"
 	var authProvider *auth.Provider
-	if cfg.Auth.Enabled && cfg.Auth.Type == "oidc" {
+	if cfg.Auth.Enabled && slices.Contains(cfg.Auth.Types, "oidc") {
 		var err error
 		authProvider, err = auth.NewProvider(context.Background(), cfg.Auth.OIDC)
 		if err != nil {
@@ -107,10 +108,10 @@ func main() {
 		logger.Info("OIDC authentication enabled", "issuer", cfg.Auth.OIDC.Issuer)
 	}
 
-	// Create basic authenticator if auth is enabled and type is basic
+	// Create basic authenticator if auth types include "basic"
 	var basicAuth *auth.BasicAuthenticator
 	var rateLimiter *auth.LoginRateLimiter
-	if cfg.Auth.Enabled && cfg.Auth.Type == "basic" {
+	if cfg.Auth.Enabled && slices.Contains(cfg.Auth.Types, "basic") {
 		basicAuth = auth.NewBasicAuthenticator(cfg.Auth.Basic.Users)
 
 		maxAttempts := cfg.Auth.Basic.RateLimit.MaxAttempts
@@ -126,12 +127,7 @@ func main() {
 		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
 	}
 
-	authType := ""
-	if cfg.Auth.Enabled {
-		authType = cfg.Auth.Type
-	}
-
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider, basicAuth, rateLimiter, authType)
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, authProvider, basicAuth, rateLimiter, cfg.Auth.Types)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {
