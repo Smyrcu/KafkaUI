@@ -7,13 +7,18 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Smyrcu/KafkaUI/internal/auth"
+	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
 type AuthHandler struct {
-	provider    *auth.Provider
+	providers   map[string]*auth.Provider
+	providerCfg []config.OIDCProvider
 	basic       *auth.BasicAuthenticator
 	rateLimiter *auth.LoginRateLimiter
 	sessions    *auth.SessionManager
@@ -22,9 +27,10 @@ type AuthHandler struct {
 	authTypes   []string
 }
 
-func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
+func NewAuthHandler(providers map[string]*auth.Provider, providerCfg []config.OIDCProvider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
 	return &AuthHandler{
-		provider:    provider,
+		providers:   providers,
+		providerCfg: providerCfg,
 		basic:       basic,
 		rateLimiter: rateLimiter,
 		sessions:    sessions,
@@ -94,7 +100,15 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state := generateState()
+	providerName := chi.URLParam(r, "provider")
+	provider, ok := h.providers[providerName]
+	if !ok {
+		writeError(w, http.StatusNotFound, "unknown OIDC provider: "+providerName)
+		return
+	}
+
+	randomPart := generateState()
+	state := randomPart + ":" + providerName
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
@@ -106,7 +120,7 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 	})
 
-	http.Redirect(w, r, h.provider.AuthCodeURL(state), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, provider.AuthCodeURL(state), http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +148,20 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract provider name from state (format: "randomPart:providerName")
+	parts := strings.SplitN(state, ":", 2)
+	if len(parts) != 2 {
+		writeError(w, http.StatusBadRequest, "invalid state format")
+		return
+	}
+	providerName := parts[1]
+
+	provider, ok := h.providers[providerName]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "unknown OIDC provider in state: "+providerName)
+		return
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    "",
@@ -142,7 +170,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	userInfo, rawToken, err := h.provider.Exchange(r.Context(), code)
+	userInfo, rawToken, err := provider.Exchange(r.Context(), code)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "oauth exchange failed: "+err.Error())
 		return
@@ -211,9 +239,18 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 		types = h.authTypes
 	}
 
+	var providers []map[string]string
+	for _, p := range h.providerCfg {
+		providers = append(providers, map[string]string{
+			"name":        p.Name,
+			"displayName": p.DisplayName,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"enabled": h.enabled,
-		"types":   types,
+		"enabled":   h.enabled,
+		"types":     types,
+		"providers": providers,
 	})
 }
 

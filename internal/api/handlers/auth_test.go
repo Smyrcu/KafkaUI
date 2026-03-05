@@ -8,7 +8,7 @@ import (
 )
 
 func TestStatus_AuthDisabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, false, nil)
+	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, false, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -33,7 +33,7 @@ func TestStatus_AuthDisabled(t *testing.T) {
 }
 
 func TestStatus_BasicOnly(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, true, []string{"basic"})
+	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic"})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestStatus_BasicOnly(t *testing.T) {
 }
 
 func TestStatus_MultiAuth(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, true, []string{"basic", "oidc"})
+	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic", "oidc"})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -73,7 +73,7 @@ func TestStatus_MultiAuth(t *testing.T) {
 }
 
 func TestLoginBasic_NotEnabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, true, []string{"oidc"})
+	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"oidc"})
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 	rr := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestLoginBasic_NotEnabled(t *testing.T) {
 }
 
 func TestLoginOIDC_NotEnabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, true, []string{"basic"})
+	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic"})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	rr := httptest.NewRecorder()
