@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(authUser);
       })
       .catch(() => {
-        setStatus({ enabled: false, type: "none" });
+        setStatus({ enabled: false, types: [] });
         setUser({ authenticated: false });
       })
       .finally(() => setLoading(false));
