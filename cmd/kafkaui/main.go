@@ -133,16 +133,40 @@ func main() {
 		logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
 	}
 
-	// Create metrics scrapers for clusters with metrics configured
+	// Create metrics scrapers and history store for clusters with metrics configured
 	metricsScrapers := make(map[string]*metrics.Scraper)
+	metricsListers := make(map[string]metrics.BrokerLister)
 	for _, cc := range cfg.Clusters {
 		if cc.Metrics.URL != "" {
 			metricsScrapers[cc.Name] = metrics.NewScraper(cc.Metrics.URL)
+			clusterName := cc.Name
+			metricsListers[clusterName] = func(ctx context.Context) ([]metrics.BrokerInfo, error) {
+				client, ok := registry.Get(clusterName)
+				if !ok {
+					return nil, fmt.Errorf("cluster %q not found", clusterName)
+				}
+				brokers, err := client.Brokers(ctx)
+				if err != nil {
+					return nil, err
+				}
+				result := make([]metrics.BrokerInfo, len(brokers))
+				for i, b := range brokers {
+					result[i] = metrics.BrokerInfo{ID: b.ID, Host: b.Host}
+				}
+				return result, nil
+			}
 			logger.Info("metrics scraper enabled", "cluster", cc.Name, "url", cc.Metrics.URL)
 		}
 	}
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types, metricsScrapers)
+	metricsStore := metrics.NewStore()
+	if len(metricsScrapers) > 0 {
+		collector := metrics.NewCollector(metricsStore, metricsScrapers, metricsListers, logger)
+		go collector.Run(context.Background())
+		logger.Info("metrics collector started", "clusters", len(metricsScrapers))
+	}
+
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types, metricsScrapers, metricsStore)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {

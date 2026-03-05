@@ -106,10 +106,16 @@ export interface BrokerMetricsData {
   offlinePartitionsCount: number;
 }
 
+export interface TimestampedMetrics {
+  time: string;
+  metrics: BrokerMetricsData;
+}
+
 export interface BrokerMetricsInfo {
   id: number;
   host: string;
   metrics?: BrokerMetricsData;
+  history?: TimestampedMetrics[];
   error?: string;
 }
 
@@ -298,7 +304,7 @@ export const api = {
       request<{ status: string }>(`/clusters/${cluster}/users/delete`, { method: 'POST', body: JSON.stringify(data) }),
   },
   metrics: {
-    get: (cluster: string) => request<MetricsResponse>(`/clusters/${cluster}/metrics`),
+    get: (cluster: string, range?: string) => request<MetricsResponse>(`/clusters/${cluster}/metrics${range ? `?range=${range}` : ''}`),
   },
   auth: {
     status: () => request<AuthStatus>('/auth/status'),

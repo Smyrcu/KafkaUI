@@ -11,7 +11,7 @@ import (
 )
 
 func TestMetricsHandler_NotConfigured(t *testing.T) {
-	h := NewMetricsHandler(nil, nil)
+	h := NewMetricsHandler(nil, nil, metrics.NewStore())
 
 	r := chi.NewRouter()
 	r.Get("/clusters/{clusterName}/metrics", h.Metrics)
@@ -29,7 +29,7 @@ func TestMetricsHandler_ClusterNotFound(t *testing.T) {
 	scrapers := map[string]*metrics.Scraper{
 		"nonexistent": metrics.NewScraper("http://localhost:1/metrics"),
 	}
-	h := NewMetricsHandler(nil, scrapers)
+	h := NewMetricsHandler(nil, scrapers, metrics.NewStore())
 
 	r := chi.NewRouter()
 	r.Get("/clusters/{clusterName}/metrics", h.Metrics)
