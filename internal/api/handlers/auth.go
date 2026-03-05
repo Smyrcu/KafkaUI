@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/Smyrcu/KafkaUI/internal/auth"
@@ -18,10 +19,10 @@ type AuthHandler struct {
 	sessions    *auth.SessionManager
 	logger      *slog.Logger
 	enabled     bool
-	authType    string
+	authTypes   []string
 }
 
-func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authType string) *AuthHandler {
+func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
 	return &AuthHandler{
 		provider:    provider,
 		basic:       basic,
@@ -29,12 +30,16 @@ func NewAuthHandler(provider *auth.Provider, basic *auth.BasicAuthenticator, rat
 		sessions:    sessions,
 		logger:      logger,
 		enabled:     enabled,
-		authType:    authType,
+		authTypes:   authTypes,
 	}
 }
 
+func (h *AuthHandler) hasType(t string) bool {
+	return slices.Contains(h.authTypes, t)
+}
+
 func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || h.authType != "basic" {
+	if !h.enabled || !h.hasType("basic") {
 		writeError(w, http.StatusNotFound, "basic auth not enabled")
 		return
 	}
@@ -84,7 +89,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || h.authType != "oidc" {
+	if !h.enabled || !h.hasType("oidc") {
 		writeError(w, http.StatusNotFound, "oidc auth not enabled")
 		return
 	}
@@ -105,7 +110,7 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || h.authType != "oidc" {
+	if !h.enabled || !h.hasType("oidc") {
 		writeError(w, http.StatusNotFound, "oidc auth not enabled")
 		return
 	}
@@ -201,14 +206,14 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
-	authType := "none"
+	var types []string
 	if h.enabled {
-		authType = h.authType
+		types = h.authTypes
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"enabled": h.enabled,
-		"type":    authType,
+		"types":   types,
 	})
 }
 
