@@ -73,3 +73,5 @@ auth:
 clusters:
   - name: local
     bootstrap-servers: localhost:9092
+    # metrics:
+    #   url: "http://{host}:9404/metrics"   # Prometheus JMX Exporter ({host} replaced with broker hostname)
