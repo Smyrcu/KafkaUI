@@ -64,19 +64,19 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(idx int, b kafka.BrokerInfo) {
 			defer wg.Done()
-			host := fmt.Sprintf("%s:%d", b.Host, b.Port)
-			m, err := scraper.Scrape(r.Context(), host)
+			display := fmt.Sprintf("%s:%d", b.Host, b.Port)
+			m, err := scraper.Scrape(r.Context(), b.Host)
 			if err != nil {
 				results[idx] = BrokerMetricsResponse{
 					ID:    b.ID,
-					Host:  host,
+					Host:  display,
 					Error: err.Error(),
 				}
 				return
 			}
 			results[idx] = BrokerMetricsResponse{
 				ID:      b.ID,
-				Host:    host,
+				Host:    display,
 				Metrics: &m,
 			}
 		}(i, broker)
