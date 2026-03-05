@@ -31,20 +31,22 @@ auth:
 #       clusters: ["*"]
 #       actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
 
-# OIDC (Google) auth example:
+# OIDC (single provider) example:
 # auth:
 #   enabled: true
 #   types: [oidc]
 #   oidc:
-#     issuer: "https://accounts.google.com"
-#     client-id: "${GOOGLE_CLIENT_ID}"
-#     client-secret: "${GOOGLE_CLIENT_SECRET}"
 #     redirect-url: "http://localhost:8080/api/v1/auth/callback"
+#     providers:
+#       - name: google
+#         issuer: "https://accounts.google.com"
+#         client-id: "${GOOGLE_CLIENT_ID}"
+#         client-secret: "${GOOGLE_CLIENT_SECRET}"
 #   session:
 #     secret: "${SESSION_SECRET}"
 #     max-age: 86400
 
-# Both basic + Google auth:
+# Multiple OIDC providers + basic auth:
 # auth:
 #   enabled: true
 #   types: [basic, oidc]
@@ -54,10 +56,17 @@ auth:
 #         password: "$2a$10$..."
 #         roles: [admin]
 #   oidc:
-#     issuer: "https://accounts.google.com"
-#     client-id: "${GOOGLE_CLIENT_ID}"
-#     client-secret: "${GOOGLE_CLIENT_SECRET}"
 #     redirect-url: "http://localhost:8080/api/v1/auth/callback"
+#     providers:
+#       - name: google
+#         issuer: "https://accounts.google.com"
+#         client-id: "${GOOGLE_CLIENT_ID}"
+#         client-secret: "${GOOGLE_CLIENT_SECRET}"
+#       - name: auth0
+#         display-name: "Auth0"
+#         issuer: "https://your-tenant.auth0.com/"
+#         client-id: "${AUTH0_CLIENT_ID}"
+#         client-secret: "${AUTH0_CLIENT_SECRET}"
 #   session:
 #     secret: "${SESSION_SECRET}"
 
