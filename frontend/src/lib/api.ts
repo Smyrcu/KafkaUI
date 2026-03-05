@@ -97,6 +97,26 @@ export interface ClusterOverview {
   status: string;
 }
 
+export interface BrokerMetricsData {
+  bytesInPerSec: number;
+  bytesOutPerSec: number;
+  messagesInPerSec: number;
+  underReplicatedPartitions: number;
+  activeControllerCount: number;
+  offlinePartitionsCount: number;
+}
+
+export interface BrokerMetricsInfo {
+  id: number;
+  host: string;
+  metrics?: BrokerMetricsData;
+  error?: string;
+}
+
+export interface MetricsResponse {
+  brokers: BrokerMetricsInfo[];
+}
+
 export interface SchemaSubjectInfo {
   subject: string;
   latestVersion: number;
@@ -276,6 +296,9 @@ export const api = {
       request<{ status: string }>(`/clusters/${cluster}/users`, { method: 'POST', body: JSON.stringify(data) }),
     delete: (cluster: string, data: DeleteScramUserRequest) =>
       request<{ status: string }>(`/clusters/${cluster}/users/delete`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+  metrics: {
+    get: (cluster: string) => request<MetricsResponse>(`/clusters/${cluster}/metrics`),
   },
   auth: {
     status: () => request<AuthStatus>('/auth/status'),
