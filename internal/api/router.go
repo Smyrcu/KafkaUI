@@ -47,6 +47,10 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 
 	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
 
+	// Dev mock metrics endpoint
+	mockMetrics := metrics.NewMockHandler()
+	r.Get("/debug/mock-metrics", mockMetrics.ServeHTTP)
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
 		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)

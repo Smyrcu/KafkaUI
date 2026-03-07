@@ -178,6 +178,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", router)
 	mux.Handle("/ws/", router)
+	mux.Handle("/debug/", router)
 	mux.Handle("/", spaHandler)
 
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
