@@ -1,0 +1,27 @@
+# Kafka with JMX Prometheus exporter for real metrics testing.
+#
+# Setup:
+#   1. Download jmx_prometheus_javaagent.jar into dev/jmx-exporter/:
+#      curl -L -o dev/jmx-exporter/jmx_prometheus_javaagent.jar \
+#        https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+#   2. docker compose -f docker-compose.dev.yaml up -d
+#   3. Update config.yaml metrics URL to: http://{host}:9404/metrics
+#
+services:
+  kafka:
+    image: docker.io/apache/kafka:3.9.0
+    ports:
+      - "9092:9092"
+      - "9404:9404"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=9404:/opt/jmx-exporter/kafka.yaml"
+    volumes:
+      - ./dev/jmx-exporter:/opt/jmx-exporter
