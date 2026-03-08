@@ -32,7 +32,7 @@ func NewCollector(store *Store, scrapers map[string]*Scraper, listers map[string
 		scrapers: scrapers,
 		listers:  listers,
 		logger:   logger,
-		interval: 30 * time.Second,
+		interval: 5 * time.Second,
 	}
 }
 

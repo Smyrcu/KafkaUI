@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import * as chrono from "chrono-node";
 import { api } from "@/lib/api";
 import type { BrokerMetricsInfo, TimestampedMetrics } from "@/lib/api";
@@ -17,7 +17,7 @@ import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const PRESETS = [
-  { key: "live", shorthand: "LIVE", label: "15 Minutes", duration: "15m", live: true },
+  { key: "live", shorthand: "LIVE", label: "Live", duration: "live", live: true },
   { key: "15m", shorthand: "15m", label: "Past 15 Minutes", duration: "15m" },
   { key: "1h", shorthand: "1h", label: "Past 1 Hour", duration: "1h" },
   { key: "4h", shorthand: "4h", label: "Past 4 Hours", duration: "4h" },
@@ -107,8 +107,18 @@ function ThroughputChart({ history, range_ }: { history: TimestampedMetrics[]; r
           ]) as any}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
-        <Line type="monotone" dataKey="bytesIn" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="bytesIn" />
-        <Line type="monotone" dataKey="bytesOut" stroke="hsl(var(--success, 142 71% 45%))" strokeWidth={2} dot={false} name="bytesOut" />
+        <defs>
+          <linearGradient id="gradBytesIn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="gradBytesOut" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Line type="monotone" dataKey="bytesIn" stroke="#60a5fa" strokeWidth={2.5} dot={false} name="bytesIn" />
+        <Line type="monotone" dataKey="bytesOut" stroke="#4ade80" strokeWidth={2.5} dot={false} name="bytesOut" />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -128,7 +138,7 @@ function MessagesChart({ history, range_ }: { history: TimestampedMetrics[]; ran
           formatter={((value: number | undefined) => [formatRate(value ?? 0), "Messages In"]) as any}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
-        <Line type="monotone" dataKey="messagesIn" stroke="hsl(var(--warning, 38 92% 50%))" strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="messagesIn" stroke="#fbbf24" strokeWidth={2.5} dot={false} />
       </LineChart>
     </ResponsiveContainer>
   );
@@ -312,24 +322,40 @@ export function MetricsPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [calFrom, setCalFrom] = useState("");
   const [calTo, setCalTo] = useState("");
+  const liveStartRef = useRef<string | null>(null);
 
-  const isLive = selectedPreset !== null && !customRange;
+  const isLive = selectedPreset === "live";
   const activePreset = [...PRESETS, ...MORE_PRESETS].find((p) => p.key === selectedPreset);
+  const isAutoRefresh = selectedPreset !== null && !customRange;
 
-  const apiRange = customRange ? undefined : (activePreset?.duration ?? "1h");
+  // For LIVE mode: growing range from activation time to now
+  // For presets: sliding window via range param
+  // For custom: fixed from/to
+  const apiRange = customRange ? undefined : (isLive ? undefined : (activePreset?.duration ?? "1h"));
+  const liveFrom = liveStartRef.current;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["metrics", clusterName, customRange ? `custom:${customRange.from}:${customRange.to}` : apiRange],
-    queryFn: () =>
-      customRange
-        ? api.metrics.get(clusterName!, undefined, customRange.from, customRange.to)
-        : api.metrics.get(clusterName!, apiRange),
-    refetchInterval: isLive ? 30000 : false,
+    queryKey: ["metrics", clusterName, isLive ? `live:${liveFrom}` : customRange ? `custom:${customRange.from}:${customRange.to}` : apiRange],
+    queryFn: () => {
+      if (isLive && liveFrom) {
+        return api.metrics.get(clusterName!, undefined, liveFrom, new Date().toISOString());
+      }
+      if (customRange) {
+        return api.metrics.get(clusterName!, undefined, customRange.from, customRange.to);
+      }
+      return api.metrics.get(clusterName!, apiRange);
+    },
+    refetchInterval: isAutoRefresh ? (isLive ? 5000 : 30000) : false,
   });
 
   function handlePresetSelect(preset: typeof PRESETS[number] | typeof MORE_PRESETS[number]) {
     setSelectedPreset(preset.key);
     setCustomRange(null);
     setInputValue("");
+    if ("live" in preset && preset.live) {
+      liveStartRef.current = new Date().toISOString();
+    } else {
+      liveStartRef.current = null;
+    }
     setPickerOpen(false);
   }
 
@@ -361,9 +387,11 @@ export function MetricsPage() {
     setPickerOpen(false);
   }
 
-  const displayLabel = customRange
-    ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
-    : activePreset?.label ?? "Past 1 Hour";
+  const displayLabel = isLive
+    ? (liveFrom ? `Since ${new Date(liveFrom).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : "Live")
+    : customRange
+      ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
+      : activePreset?.label ?? "Past 1 Hour";
 
   if (isLoading) return <TableSkeleton rows={3} cols={4} />;
 
@@ -487,9 +515,11 @@ export function MetricsPage() {
               <div className="w-[240px] p-3">
                 <p className="text-[10px] text-muted-foreground mb-1 text-right">{getTimezone()}</p>
                 <p className="text-xs font-medium mb-2 text-right">
-                  {customRange
-                    ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
-                    : formatDateRange(new Date(Date.now() - (activePreset ? parseDurationMs(activePreset.duration) : 3600000)), new Date())}
+                  {isLive && liveFrom
+                    ? `Since ${new Date(liveFrom).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" })}`
+                    : customRange
+                      ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
+                      : formatDateRange(new Date(Date.now() - (activePreset ? parseDurationMs(activePreset.duration) : 3600000)), new Date())}
                 </p>
 
                 <div className="border-t pt-2 space-y-0.5">
@@ -566,7 +596,7 @@ export function MetricsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {brokers.map((broker) => (
-          <BrokerSection key={broker.id} broker={broker} range_={effectiveRange(customRange, apiRange ?? "1h")} />
+          <BrokerSection key={broker.id} broker={broker} range_={isLive ? effectiveRange(liveFrom ? { from: liveFrom, to: new Date().toISOString() } : null, "1h") : effectiveRange(customRange, apiRange ?? "1h")} />
         ))}
       </div>
     </div>
