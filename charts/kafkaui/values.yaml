@@ -1,0 +1,31 @@
+replicaCount: 1
+
+image:
+  repository: kafkaui
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: kafkaui.local
+  tls: []
+
+resources: {}
+
+persistence:
+  enabled: false
+  size: 100Mi
+  storageClass: ""
+
+config: |
+  server:
+    port: 8080
+  clusters:
+    - name: local
+      bootstrap-servers: kafka:9092
