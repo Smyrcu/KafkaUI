@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestConsumerGroupHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/consumer-groups", nil)
@@ -29,7 +31,7 @@ func TestConsumerGroupHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestConsumerGroupHandler_Details_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/consumer-groups/my-group", nil)
@@ -47,7 +49,7 @@ func TestConsumerGroupHandler_Details_ClusterNotFound(t *testing.T) {
 }
 
 func TestConsumerGroupHandler_ResetOffsets_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	payload := map[string]any{"topic": "my-topic", "resetTo": "earliest"}
@@ -67,7 +69,7 @@ func TestConsumerGroupHandler_ResetOffsets_ClusterNotFound(t *testing.T) {
 }
 
 func TestConsumerGroupHandler_ResetOffsets_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -86,7 +88,7 @@ func TestConsumerGroupHandler_ResetOffsets_InvalidBody(t *testing.T) {
 }
 
 func TestConsumerGroupHandler_ResetOffsets_MissingTopic(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	payload := map[string]any{"topic": "", "resetTo": "earliest"}
@@ -106,7 +108,7 @@ func TestConsumerGroupHandler_ResetOffsets_MissingTopic(t *testing.T) {
 }
 
 func TestConsumerGroupHandler_ResetOffsets_InvalidResetTo(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConsumerGroupHandler(reg)
 
 	payload := map[string]any{"topic": "my-topic", "resetTo": "invalid-value"}

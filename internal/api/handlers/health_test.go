@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestHealthHandler_Liveness(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewHealthHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -32,7 +34,7 @@ func TestHealthHandler_Liveness(t *testing.T) {
 }
 
 func TestHealthHandler_Readiness(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewHealthHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
@@ -61,7 +63,7 @@ func TestHealthHandler_Readiness(t *testing.T) {
 }
 
 func TestHealthHandler_Readiness_WithInclude(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewHealthHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz?include=schema-registry,connect", nil)
@@ -105,7 +107,7 @@ func TestHealthHandler_Readiness_WithInclude(t *testing.T) {
 }
 
 func TestHealthHandler_ServiceCheck(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewHealthHandler(reg)
 
 	// Set up chi router context for {service} URL param
@@ -131,7 +133,7 @@ func TestHealthHandler_ServiceCheck(t *testing.T) {
 }
 
 func TestHealthHandler_ServiceCheck_Unknown(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewHealthHandler(reg)
 
 	r := chi.NewRouter()

@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestKsqlHandler_Execute_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	payload := map[string]any{"query": "SHOW STREAMS;"}
@@ -31,7 +33,7 @@ func TestKsqlHandler_Execute_ClusterNotFound(t *testing.T) {
 }
 
 func TestKsqlHandler_Execute_NoKsqlConfigured(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	payload := map[string]any{"query": "SHOW STREAMS;"}
@@ -50,7 +52,7 @@ func TestKsqlHandler_Execute_NoKsqlConfigured(t *testing.T) {
 }
 
 func TestKsqlHandler_Execute_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -68,7 +70,7 @@ func TestKsqlHandler_Execute_InvalidBody(t *testing.T) {
 }
 
 func TestKsqlHandler_Execute_EmptyQuery(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	payload := map[string]any{"query": ""}
@@ -87,7 +89,7 @@ func TestKsqlHandler_Execute_EmptyQuery(t *testing.T) {
 }
 
 func TestKsqlHandler_Info_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/ksql/info", nil)
@@ -104,7 +106,7 @@ func TestKsqlHandler_Info_ClusterNotFound(t *testing.T) {
 }
 
 func TestKsqlHandler_Info_NoKsqlConfigured(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewKsqlHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/ksql/info", nil)

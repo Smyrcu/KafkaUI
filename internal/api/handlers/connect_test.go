@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestConnectHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/connectors", nil)
@@ -29,7 +31,7 @@ func TestConnectHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_List_NoConnectConfigured(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/connectors", nil)
@@ -46,7 +48,7 @@ func TestConnectHandler_List_NoConnectConfigured(t *testing.T) {
 }
 
 func TestConnectHandler_Details_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/connectors/test", nil)
@@ -64,7 +66,7 @@ func TestConnectHandler_Details_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_Details_NoConnectConfigured(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/connectors/test", nil)
@@ -82,7 +84,7 @@ func TestConnectHandler_Details_NoConnectConfigured(t *testing.T) {
 }
 
 func TestConnectHandler_Create_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	payload := map[string]any{"name": "test", "config": map[string]string{"key": "val"}}
@@ -101,7 +103,7 @@ func TestConnectHandler_Create_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_Create_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -119,7 +121,7 @@ func TestConnectHandler_Create_InvalidBody(t *testing.T) {
 }
 
 func TestConnectHandler_Create_MissingName(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	payload := map[string]any{"config": map[string]string{"key": "val"}}
@@ -138,7 +140,7 @@ func TestConnectHandler_Create_MissingName(t *testing.T) {
 }
 
 func TestConnectHandler_Create_MissingConfig(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	payload := map[string]any{"name": "test"}
@@ -157,7 +159,7 @@ func TestConnectHandler_Create_MissingConfig(t *testing.T) {
 }
 
 func TestConnectHandler_Delete_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/nonexistent/connectors/test", nil)
@@ -175,7 +177,7 @@ func TestConnectHandler_Delete_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_Restart_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/nonexistent/connectors/test/restart", nil)
@@ -193,7 +195,7 @@ func TestConnectHandler_Restart_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_Pause_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/nonexistent/connectors/test/pause", nil)
@@ -211,7 +213,7 @@ func TestConnectHandler_Pause_ClusterNotFound(t *testing.T) {
 }
 
 func TestConnectHandler_Resume_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewConnectHandler(reg)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/nonexistent/connectors/test/resume", nil)

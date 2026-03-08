@@ -6,12 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestClusterHandler_List(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewClusterHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters", nil)
@@ -33,20 +33,4 @@ func TestClusterHandler_List(t *testing.T) {
 	if body[0].Name != "alpha" {
 		t.Errorf("expected first cluster 'alpha', got %q", body[0].Name)
 	}
-}
-
-func mustCreateRegistry(t *testing.T) *kafka.Registry {
-	t.Helper()
-	cfg := &config.Config{
-		Clusters: []config.ClusterConfig{
-			{Name: "alpha", BootstrapServers: "localhost:9092"},
-			{Name: "beta", BootstrapServers: "localhost:9093"},
-		},
-	}
-	reg, err := kafka.NewRegistry(cfg)
-	if err != nil {
-		t.Fatalf("failed to create registry: %v", err)
-	}
-	t.Cleanup(reg.Close)
-	return reg
 }
