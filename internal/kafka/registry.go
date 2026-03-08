@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
@@ -12,6 +13,7 @@ type ClusterInfo struct {
 }
 
 type Registry struct {
+	mu      sync.RWMutex
 	clients map[string]*Client
 	configs map[string]config.ClusterConfig
 	order   []string
@@ -38,16 +40,22 @@ func NewRegistry(cfg *config.Config) (*Registry, error) {
 }
 
 func (r *Registry) Get(name string) (*Client, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	c, ok := r.clients[name]
 	return c, ok
 }
 
 func (r *Registry) GetConfig(name string) (config.ClusterConfig, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	c, ok := r.configs[name]
 	return c, ok
 }
 
 func (r *Registry) List() []ClusterInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	result := make([]ClusterInfo, 0, len(r.order))
 	for _, name := range r.order {
 		cfg := r.configs[name]
@@ -60,10 +68,15 @@ func (r *Registry) List() []ClusterInfo {
 }
 
 func (r *Registry) ClusterCount() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return len(r.order)
 }
 
 func (r *Registry) AddCluster(cc config.ClusterConfig) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if _, exists := r.clients[cc.Name]; exists {
 		return fmt.Errorf("cluster %q already exists", cc.Name)
 	}
@@ -80,6 +93,9 @@ func (r *Registry) AddCluster(cc config.ClusterConfig) error {
 }
 
 func (r *Registry) RemoveCluster(name string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	client, exists := r.clients[name]
 	if !exists {
 		return fmt.Errorf("cluster %q not found", name)
@@ -99,9 +115,16 @@ func (r *Registry) RemoveCluster(name string) error {
 }
 
 func (r *Registry) UpdateCluster(name string, cc config.ClusterConfig) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	oldClient, exists := r.clients[name]
 	if !exists {
 		return fmt.Errorf("cluster %q not found", name)
+	}
+
+	if cc.Name != name {
+		return fmt.Errorf("cannot rename cluster %q to %q", name, cc.Name)
 	}
 
 	newClient, err := NewClient(cc)
@@ -116,6 +139,8 @@ func (r *Registry) UpdateCluster(name string, cc config.ClusterConfig) error {
 }
 
 func (r *Registry) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	for _, c := range r.clients {
 		c.Close()
 	}
