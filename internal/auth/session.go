@@ -23,10 +23,11 @@ type SessionManager struct {
 
 // SessionData holds the user information stored within the session cookie.
 type SessionData struct {
-	Token string   `json:"token"`
-	Email string   `json:"email"`
-	Name  string   `json:"name"`
-	Roles []string `json:"roles"`
+	Token     string   `json:"token"`
+	Email     string   `json:"email"`
+	Name      string   `json:"name"`
+	Roles     []string `json:"roles"`
+	CreatedAt int64    `json:"created_at"`
 }
 
 // NewSessionManager creates a new SessionManager with the given secret and maximum age in seconds.
@@ -44,6 +45,7 @@ func NewSessionManager(secret string, maxAge int) *SessionManager {
 // CreateSession encodes the SessionData as JSON, signs it with HMAC-SHA256, and sets it as
 // an HTTP-only cookie. The cookie is Secure when the request origin is not localhost.
 func (sm *SessionManager) CreateSession(w http.ResponseWriter, r *http.Request, data SessionData) error {
+	data.CreatedAt = time.Now().Unix()
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("encoding session data: %w", err)
@@ -83,6 +85,10 @@ func (sm *SessionManager) GetSession(r *http.Request) (*SessionData, error) {
 	var data SessionData
 	if err := json.Unmarshal(jsonData, &data); err != nil {
 		return nil, fmt.Errorf("decoding session data: %w", err)
+	}
+
+	if data.CreatedAt > 0 && time.Now().Unix()-data.CreatedAt > int64(sm.maxAge) {
+		return nil, fmt.Errorf("session expired")
 	}
 
 	return &data, nil

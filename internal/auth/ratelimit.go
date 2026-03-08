@@ -17,6 +17,7 @@ type LoginRateLimiter struct {
 	attempts    map[string]*loginAttempt
 	maxAttempts int
 	window      time.Duration
+	callCount   int
 }
 
 // NewLoginRateLimiter creates a rate limiter that allows maxAttempts
@@ -34,6 +35,16 @@ func NewLoginRateLimiter(maxAttempts int, window time.Duration) *LoginRateLimite
 func (rl *LoginRateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
+
+	rl.callCount++
+	if rl.callCount%100 == 0 {
+		now := time.Now()
+		for k, a := range rl.attempts {
+			if now.Sub(a.windowStart) > rl.window {
+				delete(rl.attempts, k)
+			}
+		}
+	}
 
 	now := time.Now()
 	attempt, exists := rl.attempts[key]

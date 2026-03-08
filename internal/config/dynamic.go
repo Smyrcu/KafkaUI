@@ -25,11 +25,6 @@ func NewDynamicConfig(path string) *DynamicConfig {
 	return &DynamicConfig{path: path}
 }
 
-// Path returns the file path used for persistence.
-func (dc *DynamicConfig) Path() string {
-	return dc.path
-}
-
 // Load reads the dynamic clusters file. Returns nil, nil if the file does not exist.
 func (dc *DynamicConfig) Load() ([]ClusterConfig, error) {
 	dc.mu.Lock()
