@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -40,13 +39,15 @@ func (h *ConnectHandler) getConnectClients(w http.ResponseWriter, r *http.Reques
 
 // findConnector locates a connector by name across all connect clusters.
 func (h *ConnectHandler) findConnector(ctx context.Context, clients []*connect.Client, connectorName string) (*connect.Client, *connect.ConnectorDetail, error) {
+	var lastErr error
 	for _, client := range clients {
 		detail, err := client.GetConnector(ctx, connectorName)
 		if err == nil {
 			return client, detail, nil
 		}
+		lastErr = err
 	}
-	return nil, nil, fmt.Errorf("connector %q not found in any connect cluster", connectorName)
+	return nil, nil, fmt.Errorf("connector %q not found in any connect cluster: %w", connectorName, lastErr)
 }
 
 func (h *ConnectHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +60,7 @@ func (h *ConnectHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, client := range clients {
 		connectors, err := client.ListConnectors(r.Context())
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w)
 			return
 		}
 		allConnectors = append(allConnectors, connectors...)
@@ -87,8 +88,7 @@ func (h *ConnectHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 func (h *ConnectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req connect.CreateConnectorRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -107,13 +107,13 @@ func (h *ConnectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(clients) == 0 {
-		writeError(w, http.StatusInternalServerError, "no connect clients available")
+		writeInternalError(w)
 		return
 	}
 
 	result, err := clients[0].CreateConnector(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -124,8 +124,7 @@ func (h *ConnectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	connectorName := chi.URLParam(r, "connectorName")
 
 	var config map[string]string
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &config) {
 		return
 	}
 
@@ -142,7 +141,7 @@ func (h *ConnectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.UpdateConnector(r.Context(), connectorName, config)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -164,14 +163,17 @@ func (h *ConnectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteConnector(r.Context(), connectorName); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-func (h *ConnectHandler) Restart(w http.ResponseWriter, r *http.Request) {
+// connectorAction is a shared helper for Restart, Pause, and Resume which all
+// follow the same lookup-then-act pattern. actionName is used in the response
+// body (e.g. "restarted") and fn performs the actual Connect REST call.
+func (h *ConnectHandler) connectorAction(w http.ResponseWriter, r *http.Request, actionName string, fn func(ctx context.Context, client *connect.Client, name string) error) {
 	connectorName := chi.URLParam(r, "connectorName")
 
 	clients, ok := h.getConnectClients(w, r)
@@ -179,60 +181,34 @@ func (h *ConnectHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, _, err := h.findConnector(r.Context(), clients, connectorName)
+	connectClient, _, err := h.findConnector(r.Context(), clients, connectorName)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	if err := client.RestartConnector(r.Context(), connectorName); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	if err := fn(r.Context(), connectClient, connectorName); err != nil {
+		writeInternalError(w)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "restarted"})
+	writeJSON(w, http.StatusOK, map[string]string{"status": actionName})
+}
+
+func (h *ConnectHandler) Restart(w http.ResponseWriter, r *http.Request) {
+	h.connectorAction(w, r, "restarted", func(ctx context.Context, c *connect.Client, name string) error {
+		return c.RestartConnector(ctx, name)
+	})
 }
 
 func (h *ConnectHandler) Pause(w http.ResponseWriter, r *http.Request) {
-	connectorName := chi.URLParam(r, "connectorName")
-
-	clients, ok := h.getConnectClients(w, r)
-	if !ok {
-		return
-	}
-
-	client, _, err := h.findConnector(r.Context(), clients, connectorName)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	if err := client.PauseConnector(r.Context(), connectorName); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "paused"})
+	h.connectorAction(w, r, "paused", func(ctx context.Context, c *connect.Client, name string) error {
+		return c.PauseConnector(ctx, name)
+	})
 }
 
 func (h *ConnectHandler) Resume(w http.ResponseWriter, r *http.Request) {
-	connectorName := chi.URLParam(r, "connectorName")
-
-	clients, ok := h.getConnectClients(w, r)
-	if !ok {
-		return
-	}
-
-	client, _, err := h.findConnector(r.Context(), clients, connectorName)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	if err := client.ResumeConnector(r.Context(), connectorName); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+	h.connectorAction(w, r, "resumed", func(ctx context.Context, c *connect.Client, name string) error {
+		return c.ResumeConnector(ctx, name)
+	})
 }

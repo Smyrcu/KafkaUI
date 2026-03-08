@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -18,16 +17,14 @@ func NewConsumerGroupHandler(reg *kafka.Registry) *ConsumerGroupHandler {
 }
 
 func (h *ConsumerGroupHandler) List(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	groups, err := client.ConsumerGroups(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -35,18 +32,16 @@ func (h *ConsumerGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ConsumerGroupHandler) Details(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	groupName := chi.URLParam(r, "groupName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	detail, err := client.ConsumerGroupDetails(r.Context(), groupName)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -54,18 +49,15 @@ func (h *ConsumerGroupHandler) Details(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ConsumerGroupHandler) ResetOffsets(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	groupName := chi.URLParam(r, "groupName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var req kafka.ResetOffsetsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -79,7 +71,7 @@ func (h *ConsumerGroupHandler) ResetOffsets(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := client.ResetConsumerGroupOffsets(r.Context(), groupName, req); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 

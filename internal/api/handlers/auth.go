@@ -3,7 +3,6 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -64,8 +63,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -82,7 +80,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.sessions.CreateSession(w, r, *session); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
+		writeInternalError(w)
 		return
 	}
 
@@ -172,7 +170,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	userInfo, rawToken, err := provider.Exchange(r.Context(), code)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "oauth exchange failed: "+err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -182,7 +180,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Name:  userInfo.Name,
 		Roles: userInfo.Roles,
 	}); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session: "+err.Error())
+		writeInternalError(w)
 		return
 	}
 

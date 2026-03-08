@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -18,16 +17,14 @@ func NewTopicHandler(reg *kafka.Registry) *TopicHandler {
 }
 
 func (h *TopicHandler) List(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	topics, err := client.Topics(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -35,18 +32,16 @@ func (h *TopicHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TopicHandler) Details(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	topicName := chi.URLParam(r, "topicName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	detail, err := client.TopicDetails(r.Context(), topicName)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -54,16 +49,13 @@ func (h *TopicHandler) Details(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var req kafka.CreateTopicRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -79,7 +71,7 @@ func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.CreateTopic(r.Context(), req); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -87,17 +79,15 @@ func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TopicHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	topicName := chi.URLParam(r, "topicName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	if err := client.DeleteTopic(r.Context(), topicName); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 

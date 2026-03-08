@@ -65,15 +65,14 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	brokers, err := client.Brokers(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("listing brokers: %v", err))
+		writeInternalError(w)
 		return
 	}
 

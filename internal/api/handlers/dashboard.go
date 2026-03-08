@@ -63,9 +63,8 @@ func (h *DashboardHandler) Overview(w http.ResponseWriter, r *http.Request) {
 func (h *DashboardHandler) ClusterOverviewDetail(w http.ResponseWriter, r *http.Request) {
 	clusterName := chi.URLParam(r, "clusterName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 

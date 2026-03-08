@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -34,8 +33,7 @@ func (h *KsqlHandler) getKsqlClient(w http.ResponseWriter, r *http.Request) (*ks
 
 func (h *KsqlHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	var req ksql.ExecuteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -51,7 +49,7 @@ func (h *KsqlHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.Execute(r.Context(), req.Query)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -66,7 +64,7 @@ func (h *KsqlHandler) Info(w http.ResponseWriter, r *http.Request) {
 
 	info, err := client.Info(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 

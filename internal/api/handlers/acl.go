@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
@@ -18,16 +15,14 @@ func NewACLHandler(reg *kafka.Registry) *ACLHandler {
 }
 
 func (h *ACLHandler) List(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	acls, err := client.ListACLs(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -35,16 +30,13 @@ func (h *ACLHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ACLHandler) Create(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var entry kafka.ACLEntry
-	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &entry) {
 		return
 	}
 
@@ -77,7 +69,7 @@ func (h *ACLHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.CreateACL(r.Context(), entry); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
@@ -85,16 +77,13 @@ func (h *ACLHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ACLHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var entry kafka.ACLEntry
-	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &entry) {
 		return
 	}
 
@@ -108,7 +97,7 @@ func (h *ACLHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteACL(r.Context(), entry); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w)
 		return
 	}
 
