@@ -23,6 +23,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - Dark/Light theme
 - Swagger UI + OpenAPI spec
 - Single binary deployment with Docker support
+- Helm chart for Kubernetes deployment
 
 ## Tech Stack
 
@@ -61,6 +62,15 @@ make docker
 # Run with custom config
 docker run -p 8080:8080 -v $(pwd)/config.yaml:/etc/kafkaui/config.yaml kafkaui
 ```
+
+### Helm (Kubernetes)
+
+```bash
+helm install kafkaui charts/kafkaui \
+  --set config="$(cat config.yaml)"
+```
+
+See [`charts/kafkaui/values.yaml`](charts/kafkaui/values.yaml) for all options (ingress, persistence, resources).
 
 ## Development
 
