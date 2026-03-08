@@ -59,6 +59,62 @@ func (r *Registry) List() []ClusterInfo {
 	return result
 }
 
+func (r *Registry) ClusterCount() int {
+	return len(r.order)
+}
+
+func (r *Registry) AddCluster(cc config.ClusterConfig) error {
+	if _, exists := r.clients[cc.Name]; exists {
+		return fmt.Errorf("cluster %q already exists", cc.Name)
+	}
+
+	client, err := NewClient(cc)
+	if err != nil {
+		return fmt.Errorf("creating client for cluster %q: %w", cc.Name, err)
+	}
+
+	r.clients[cc.Name] = client
+	r.configs[cc.Name] = cc
+	r.order = append(r.order, cc.Name)
+	return nil
+}
+
+func (r *Registry) RemoveCluster(name string) error {
+	client, exists := r.clients[name]
+	if !exists {
+		return fmt.Errorf("cluster %q not found", name)
+	}
+
+	client.Close()
+	delete(r.clients, name)
+	delete(r.configs, name)
+
+	for i, n := range r.order {
+		if n == name {
+			r.order = append(r.order[:i], r.order[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+func (r *Registry) UpdateCluster(name string, cc config.ClusterConfig) error {
+	oldClient, exists := r.clients[name]
+	if !exists {
+		return fmt.Errorf("cluster %q not found", name)
+	}
+
+	newClient, err := NewClient(cc)
+	if err != nil {
+		return fmt.Errorf("creating client for cluster %q: %w", cc.Name, err)
+	}
+
+	oldClient.Close()
+	r.clients[name] = newClient
+	r.configs[name] = cc
+	return nil
+}
+
 func (r *Registry) Close() {
 	for _, c := range r.clients {
 		c.Close()
