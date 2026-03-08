@@ -14,7 +14,7 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
-import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter } from "lucide-react";
+import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter, Download } from "lucide-react";
 
 type OffsetMode = "latest" | "earliest" | "timestamp" | "custom";
 
@@ -93,6 +93,21 @@ export function TopicMessagesPage() {
   };
 
   const messages = isLiveTail ? liveMessages : (fetchedMessages || []);
+
+  const handleDownload = () => {
+    if (messages.length === 0) return;
+    const partitionLabel = partition || "all";
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${topicName}_${partitionLabel}_${ts}.json`;
+
+    const blob = new Blob([JSON.stringify(messages, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const rowKey = (m: MessageRecord) => `${m.partition}-${m.offset}`;
 
   const tryFormatJson = (s: string) => {
@@ -156,6 +171,11 @@ export function TopicMessagesPage() {
         </Button>
         {isLiveTail && (
           <Button variant="ghost" size="sm" onClick={clear}>Clear ({liveMessages.length})</Button>
+        )}
+        {messages.length > 0 && (
+          <Button variant="outline" onClick={handleDownload}>
+            <Download className="h-4 w-4 mr-2" />Download JSON
+          </Button>
         )}
         <div className="ml-auto">
           <Dialog open={produceOpen} onOpenChange={setProduceOpen}>
