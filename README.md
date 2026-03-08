@@ -23,6 +23,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - Dark/Light theme
 - Swagger UI + OpenAPI spec
 - Health probes (`/healthz`, `/readyz`, `/readyz/{service}`)
+- Dynamic cluster management (add/edit/remove clusters from UI, persisted in `dynamic.yaml`)
 - Single binary deployment with Docker support
 
 ## Tech Stack

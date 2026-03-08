@@ -27,7 +27,8 @@ func newTestRouter(t *testing.T) http.Handler {
 	t.Cleanup(reg.Close)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	sessions := auth.NewSessionManager("test-secret", 3600)
-	return NewRouter(reg, logger, sessions, false, nil, nil, nil, nil, nil, nil, nil, nil)
+	dynamicCfg := config.NewDynamicConfig(t.TempDir() + "/dynamic.yaml")
+	return NewRouter(reg, logger, sessions, false, nil, nil, nil, nil, nil, nil, nil, nil, dynamicCfg, []string{"test-cluster"})
 }
 
 func TestRouter_ClusterRoutes(t *testing.T) {
