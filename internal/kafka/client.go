@@ -121,25 +121,9 @@ type ResetOffsetsRequest struct {
 }
 
 func NewClient(cfg config.ClusterConfig) (*Client, error) {
-	seeds := strings.Split(cfg.BootstrapServers, ",")
-	opts := []kgo.Opt{
-		kgo.SeedBrokers(seeds...),
-	}
-
-	if cfg.SASL.Mechanism != "" {
-		saslOpt, err := BuildSASLOpt(cfg.SASL)
-		if err != nil {
-			return nil, fmt.Errorf("configuring SASL: %w", err)
-		}
-		opts = append(opts, saslOpt)
-	}
-
-	if cfg.TLS.Enabled {
-		tlsOpt, err := BuildTLSOpt(cfg.TLS)
-		if err != nil {
-			return nil, fmt.Errorf("configuring TLS: %w", err)
-		}
-		opts = append(opts, tlsOpt)
+	opts, err := BuildBaseOpts(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	raw, err := kgo.NewClient(opts...)
@@ -278,26 +262,34 @@ func (c *Client) Config() config.ClusterConfig {
 	return c.config
 }
 
-func (c *Client) newConsumerOpts() ([]kgo.Opt, error) {
-	seeds := strings.Split(c.config.BootstrapServers, ",")
+// BuildBaseOpts constructs the common kgo.Opt slice (seed brokers, SASL, TLS)
+// from a ClusterConfig. Both the main client constructor and any ad-hoc
+// consumers (e.g. live tail, message browse) should use this to avoid
+// duplicating auth/TLS wiring.
+func BuildBaseOpts(cfg config.ClusterConfig) ([]kgo.Opt, error) {
+	seeds := strings.Split(cfg.BootstrapServers, ",")
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(seeds...),
 	}
-	if c.config.SASL.Mechanism != "" {
-		saslOpt, err := BuildSASLOpt(c.config.SASL)
+	if cfg.SASL.Mechanism != "" {
+		saslOpt, err := BuildSASLOpt(cfg.SASL)
 		if err != nil {
-			return nil, fmt.Errorf("configuring SASL for consumer: %w", err)
+			return nil, fmt.Errorf("configuring SASL: %w", err)
 		}
 		opts = append(opts, saslOpt)
 	}
-	if c.config.TLS.Enabled {
-		tlsOpt, err := BuildTLSOpt(c.config.TLS)
+	if cfg.TLS.Enabled {
+		tlsOpt, err := BuildTLSOpt(cfg.TLS)
 		if err != nil {
-			return nil, fmt.Errorf("configuring TLS for consumer: %w", err)
+			return nil, fmt.Errorf("configuring TLS: %w", err)
 		}
 		opts = append(opts, tlsOpt)
 	}
 	return opts, nil
+}
+
+func (c *Client) newConsumerOpts() ([]kgo.Opt, error) {
+	return BuildBaseOpts(c.config)
 }
 
 func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeRequest) ([]MessageRecord, error) {
@@ -412,17 +404,13 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 			if len(records) >= req.Limit {
 				return
 			}
-			headers := make(map[string]string)
-			for _, h := range r.Headers {
-				headers[h.Key] = string(h.Value)
-			}
 			records = append(records, MessageRecord{
 				Partition: r.Partition,
 				Offset:    r.Offset,
 				Timestamp: r.Timestamp,
 				Key:       string(r.Key),
 				Value:     string(r.Value),
-				Headers:   headers,
+				Headers:   recordHeaders(r),
 			})
 		})
 		// No new messages — topic exhausted, stop waiting.
@@ -460,17 +448,13 @@ func (c *Client) ProduceMessage(ctx context.Context, topic string, req ProduceRe
 		return nil, fmt.Errorf("producing message: %w", produceErr)
 	}
 
-	headers := make(map[string]string)
-	for _, h := range r.Headers {
-		headers[h.Key] = string(h.Value)
-	}
 	return &MessageRecord{
 		Partition: r.Partition,
 		Offset:    r.Offset,
 		Timestamp: r.Timestamp,
 		Key:       string(r.Key),
 		Value:     string(r.Value),
-		Headers:   headers,
+		Headers:   recordHeaders(r),
 	}, nil
 }
 
@@ -501,10 +485,6 @@ func (c *Client) ConsumerGroups(ctx context.Context) ([]ConsumerGroupInfo, error
 			CoordinatorID: g.Coordinator.NodeID,
 		})
 	}
-
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
-	})
 
 	return result, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -305,7 +306,7 @@ func TestClient_ServerError(t *testing.T) {
 	}
 
 	errMsg := err.Error()
-	if !contains(errMsg, "500") {
+	if !strings.Contains(errMsg, "500") {
 		t.Errorf("expected error to contain status code '500', got: %s", errMsg)
 	}
 }
@@ -345,16 +346,3 @@ func TestClient_ConnectClusterName(t *testing.T) {
 	}
 }
 
-// contains checks if substr is present in s.
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchString(s, substr)
-}
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

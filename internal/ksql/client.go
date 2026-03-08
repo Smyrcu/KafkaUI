@@ -5,15 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Smyrcu/KafkaUI/internal/httpclient"
 )
 
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	http *httpclient.Client
 }
 
 type ExecuteRequest struct {
@@ -33,8 +32,13 @@ type Warning struct {
 
 func NewClient(baseURL string) *Client {
 	return &Client{
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		http: httpclient.New(
+			strings.TrimRight(baseURL, "/"),
+			30*time.Second,
+			"application/vnd.ksql.v1+json",
+			"application/vnd.ksql.v1+json",
+			"ksql error",
+		),
 	}
 }
 
@@ -50,7 +54,7 @@ func (c *Client) Execute(ctx context.Context, query string) (*ExecuteResponse, e
 		return nil, fmt.Errorf("marshal request body: %w", err)
 	}
 
-	respBody, err := c.doRequest(ctx, http.MethodPost, "/ksql", bytes.NewReader(encoded))
+	respBody, err := c.http.DoRaw(ctx, "POST", "/ksql", bytes.NewReader(encoded))
 	if err != nil {
 		return nil, fmt.Errorf("execute ksql: %w", err)
 	}
@@ -86,7 +90,7 @@ func (c *Client) Execute(ctx context.Context, query string) (*ExecuteResponse, e
 
 // Info returns KSQL server info (version, cluster ID, etc.) as a generic map.
 func (c *Client) Info(ctx context.Context) (map[string]any, error) {
-	respBody, err := c.doRequest(ctx, http.MethodGet, "/info", nil)
+	respBody, err := c.http.DoRaw(ctx, "GET", "/info", nil)
 	if err != nil {
 		return nil, fmt.Errorf("get ksql info: %w", err)
 	}
@@ -97,35 +101,4 @@ func (c *Client) Info(ctx context.Context) (map[string]any, error) {
 	}
 
 	return result, nil
-}
-
-// doRequest is a shared HTTP helper that creates a request, sets KSQL-specific
-// headers, executes it, checks the status code, and returns the raw response body.
-func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Accept", "application/vnd.ksql.v1+json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/vnd.ksql.v1+json")
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("ksql error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	return respBody, nil
 }

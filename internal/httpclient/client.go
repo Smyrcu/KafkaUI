@@ -1,0 +1,117 @@
+package httpclient
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
+
+// Client is a reusable HTTP client for JSON-based APIs. It handles request
+// encoding, response decoding, and error formatting with configurable
+// content types and error prefixes.
+type Client struct {
+	BaseURL     string
+	HTTPClient  *http.Client
+	ContentType string
+	Accept      string
+	ErrorPrefix string
+}
+
+// New creates a Client with the given settings. The baseURL should not have a
+// trailing slash (callers are expected to trim it before passing).
+func New(baseURL string, timeout time.Duration, contentType, accept, errorPrefix string) *Client {
+	return &Client{
+		BaseURL:     baseURL,
+		HTTPClient:  &http.Client{Timeout: timeout},
+		ContentType: contentType,
+		Accept:      accept,
+		ErrorPrefix: errorPrefix,
+	}
+}
+
+// Do performs an HTTP request. If body is non-nil it is JSON-encoded and sent
+// as the request body. If dest is non-nil the response body is JSON-decoded
+// into it.
+func (c *Client) Do(ctx context.Context, method, path string, body any, dest any) error {
+	var bodyReader io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("marshal request body: %w", err)
+		}
+		bodyReader = bytes.NewReader(encoded)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, bodyReader)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	if c.Accept != "" {
+		req.Header.Set("Accept", c.Accept)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", c.ContentType)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("%s (%d): %s", c.ErrorPrefix, resp.StatusCode, string(respBody))
+	}
+
+	if dest != nil {
+		if err := json.Unmarshal(respBody, dest); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// DoRaw performs an HTTP request and returns the raw response body. This is
+// useful when the caller needs to handle non-standard JSON structures or
+// needs the raw bytes for custom unmarshalling.
+func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if c.Accept != "" {
+		req.Header.Set("Accept", c.Accept)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", c.ContentType)
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("%s (%d): %s", c.ErrorPrefix, resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}
