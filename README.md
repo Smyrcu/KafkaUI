@@ -22,6 +22,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - Data masking engine for sensitive fields
 - Dark/Light theme
 - Swagger UI + OpenAPI spec
+- Health probes (`/healthz`, `/readyz`, `/readyz/{service}`)
 - Single binary deployment with Docker support
 
 ## Tech Stack
