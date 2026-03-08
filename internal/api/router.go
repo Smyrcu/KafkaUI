@@ -18,7 +18,7 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/metrics"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string, metricsScrapers map[string]*metrics.Scraper, metricsStore *metrics.Store) http.Handler {
+func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string, metricsScrapers map[string]*metrics.Scraper, metricsStore *metrics.Store, dynamicCfg *config.DynamicConfig, staticClusterNames []string) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
@@ -45,6 +45,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	metricsHandler := handlers.NewMetricsHandler(registry, metricsScrapers, metricsStore)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
+	adminHandler := handlers.NewAdminHandler(registry, dynamicCfg, staticClusterNames)
 	healthHandler := handlers.NewHealthHandler(registry)
 
 	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
@@ -76,6 +77,14 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 
 			r.Get("/dashboard", dashboardHandler.Overview)
 			r.Get("/clusters", clusterHandler.List)
+
+			r.Route("/admin", func(r chi.Router) {
+				r.Get("/clusters", adminHandler.ListClusters)
+				r.Post("/clusters", adminHandler.AddCluster)
+				r.Post("/clusters/test", adminHandler.TestConnection)
+				r.Put("/clusters/{name}", adminHandler.UpdateCluster)
+				r.Delete("/clusters/{name}", adminHandler.DeleteCluster)
+			})
 
 			r.Route("/clusters/{clusterName}", func(r chi.Router) {
 				r.Get("/overview", dashboardHandler.ClusterOverviewDetail)
