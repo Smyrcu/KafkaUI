@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"syscall"
 	"time"
@@ -72,6 +73,31 @@ func main() {
 	if err != nil {
 		logger.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	// Collect static cluster names before merging dynamic
+	staticClusterNames := make([]string, 0, len(cfg.Clusters))
+	for _, c := range cfg.Clusters {
+		staticClusterNames = append(staticClusterNames, c.Name)
+	}
+
+	// Load and merge dynamic clusters
+	dynamicPath := filepath.Join(filepath.Dir(*configPath), "dynamic.yaml")
+	dynamicCfg := config.NewDynamicConfig(dynamicPath)
+	dynClusters, err := dynamicCfg.Load()
+	if err != nil {
+		logger.Warn("failed to load dynamic config", "error", err)
+	} else if len(dynClusters) > 0 {
+		staticSet := make(map[string]bool, len(cfg.Clusters))
+		for _, c := range cfg.Clusters {
+			staticSet[c.Name] = true
+		}
+		for _, dc := range dynClusters {
+			if !staticSet[dc.Name] {
+				cfg.Clusters = append(cfg.Clusters, dc)
+			}
+		}
+		logger.Info("loaded dynamic clusters", "count", len(dynClusters))
 	}
 
 	registry, err := kafka.NewRegistry(cfg)
@@ -166,7 +192,7 @@ func main() {
 		logger.Info("metrics collector started", "clusters", len(metricsScrapers))
 	}
 
-	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types, metricsScrapers, metricsStore)
+	router := api.NewRouter(registry, logger, sessions, cfg.Auth.Enabled, maskingEngine, oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, cfg.Auth.Types, metricsScrapers, metricsStore, dynamicCfg, staticClusterNames)
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
 	if err != nil {
