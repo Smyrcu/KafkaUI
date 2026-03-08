@@ -45,11 +45,18 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	metricsHandler := handlers.NewMetricsHandler(registry, metricsScrapers, metricsStore)
 	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
 
+	healthHandler := handlers.NewHealthHandler(registry)
+
 	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
 
 	// Dev mock metrics endpoint
 	mockMetrics := metrics.NewMockHandler()
 	r.Get("/debug/mock-metrics", mockMetrics.ServeHTTP)
+
+	// Health probes — top-level, no auth
+	r.Get("/healthz", healthHandler.Liveness)
+	r.Get("/readyz", healthHandler.Readiness)
+	r.Get("/readyz/{service}", healthHandler.ServiceCheck)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
