@@ -40,7 +40,10 @@ func TestHealthHandler_Readiness(t *testing.T) {
 
 	h.Readiness(rec, req)
 
-	// Will be 503 since no real Kafka, but response body must be valid JSON
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", rec.Code)
+	}
+
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
@@ -81,8 +84,23 @@ func TestHealthHandler_Readiness_WithInclude(t *testing.T) {
 	if components["schema-registry"] == nil {
 		t.Fatal("expected 'schema-registry' component in response")
 	}
+	srComponent, ok := components["schema-registry"].(map[string]any)
+	if !ok {
+		t.Fatal("expected 'schema-registry' component to be an object")
+	}
+	if srComponent["status"] != "not_configured" {
+		t.Errorf("expected schema-registry status 'not_configured', got %q", srComponent["status"])
+	}
+
 	if components["connect"] == nil {
 		t.Fatal("expected 'connect' component in response")
+	}
+	connectComponent, ok := components["connect"].(map[string]any)
+	if !ok {
+		t.Fatal("expected 'connect' component to be an object")
+	}
+	if connectComponent["status"] != "not_configured" {
+		t.Errorf("expected connect status 'not_configured', got %q", connectComponent["status"])
 	}
 }
 
@@ -99,12 +117,16 @@ func TestHealthHandler_ServiceCheck(t *testing.T) {
 
 	r.ServeHTTP(rec, req)
 
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
 	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if body["status"] == nil {
-		t.Fatal("expected 'status' field in response")
+	if body["status"] != "not_configured" {
+		t.Errorf("expected status 'not_configured', got %q", body["status"])
 	}
 }
 

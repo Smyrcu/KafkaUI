@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -229,5 +230,8 @@ func httpHealthCheck(ctx context.Context, url string) error {
 		return err
 	}
 	resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("unhealthy: HTTP %d", resp.StatusCode)
+	}
 	return nil
 }
