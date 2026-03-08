@@ -241,6 +241,33 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface AdminClusterInfo {
+  name: string;
+  bootstrapServers: string;
+  dynamic: boolean;
+}
+
+export interface AdminClusterList {
+  static: AdminClusterInfo[];
+  dynamic: AdminClusterInfo[];
+}
+
+export interface AddClusterRequest {
+  name: string;
+  bootstrapServers: string;
+  tls?: { enabled: boolean; caFile?: string };
+  sasl?: { mechanism: string; username: string; password: string };
+  schemaRegistry?: { url: string };
+  kafkaConnect?: { name: string; url: string }[];
+  ksql?: { url: string };
+  metrics?: { url: string };
+}
+
+export interface TestConnectionResult {
+  status: string;
+  error?: string;
+}
+
 export const api = {
   dashboard: { overview: () => request<ClusterOverview[]>('/dashboard') },
   clusters: { list: () => request<ClusterInfo[]>('/clusters') },
@@ -321,5 +348,16 @@ export const api = {
     me: () => request<AuthUser>('/auth/me'),
     login: (data: LoginRequest) => request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
     logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+  },
+  admin: {
+    listClusters: () => request<AdminClusterList>('/admin/clusters'),
+    addCluster: (data: AddClusterRequest, validate = true) =>
+      request<AdminClusterInfo>(`/admin/clusters${validate ? '' : '?validate=false'}`, { method: 'POST', body: JSON.stringify(data) }),
+    updateCluster: (name: string, data: AddClusterRequest, validate = true) =>
+      request<AdminClusterInfo>(`/admin/clusters/${encodeURIComponent(name)}${validate ? '' : '?validate=false'}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteCluster: (name: string) =>
+      request<{ status: string }>(`/admin/clusters/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+    testConnection: (data: AddClusterRequest) =>
+      request<TestConnectionResult>('/admin/clusters/test', { method: 'POST', body: JSON.stringify(data) }),
   },
 };
