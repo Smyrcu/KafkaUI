@@ -5,6 +5,34 @@ image:
   tag: ""
   pullPolicy: IfNotPresent
 
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 65534
+
+securityContext:
+  runAsUser: 65534
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+env: []
+envFrom: []
+
+podAnnotations: {}
+
+extraVolumes: []
+extraVolumeMounts: []
+
 service:
   type: ClusterIP
   port: 8080
