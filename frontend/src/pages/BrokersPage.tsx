@@ -25,7 +25,7 @@ export function BrokersPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Brokers" breadcrumbs={breadcrumbs} /><TableSkeleton /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
 
   return (
     <div>

@@ -29,7 +29,7 @@ export function DashboardPage() {
   });
 
   if (isLoading) return <DashboardSkeleton />;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
 
   const clusters = overview ?? [];
 

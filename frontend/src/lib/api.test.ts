@@ -84,6 +84,13 @@ describe('api.messages', () => {
     expect(url).toContain('limit=50');
   });
 
+  it('browse includes offset "0" in query string', async () => {
+    mockResponse([]);
+    await api.messages.browse('cluster', 'topic', { offset: '0' });
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('offset=0');
+  });
+
   it('browse without params has no query string', async () => {
     mockResponse([]);
     await api.messages.browse('cluster', 'topic');

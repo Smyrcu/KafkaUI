@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api, type CreateTopicRequest } from "@/lib/api";
@@ -13,14 +13,18 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useSearchFilter } from "@/hooks/useSearchFilter";
+import { getErrorMessage } from "@/lib/error-utils";
 import type { TopicInfo } from "@/lib/api";
 
 export function TopicsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState<CreateTopicRequest>({ name: "", partitions: 1, replicas: 1 });
+  const topicAccessor = useCallback((t: TopicInfo) => t.name, []);
 
   const { data: topics, isLoading, error, refetch } = useQuery({
     queryKey: ["topics", clusterName],
@@ -42,7 +46,7 @@ export function TopicsPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["topics", clusterName] }); },
   });
 
-  const filteredTopics = topics?.filter((t) => t.name.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const { search, setSearch, filtered: filteredTopics } = useSearchFilter(topics ?? [], topicAccessor);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -51,7 +55,7 @@ export function TopicsPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Topics" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
 
   return (
     <div>
@@ -87,7 +91,7 @@ export function TopicsPage() {
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
               </DialogFooter>
-              {createMutation.isError && <p className="text-sm text-destructive mt-2">{(createMutation.error as Error).message}</p>}
+              {createMutation.isError && <p className="text-sm text-destructive mt-2">{getErrorMessage(createMutation.error)}</p>}
             </DialogContent>
           </Dialog>
         }
@@ -107,13 +111,21 @@ export function TopicsPage() {
             { header: "Replicas", accessorKey: "replicas" },
             { header: "Internal", cell: (t) => t.internal ? <Badge variant="secondary">internal</Badge> : null },
             { header: "Actions", className: "w-[80px]", cell: (t) => !t.internal ? (
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); if (confirm(`Delete topic "${t.name}"?`)) deleteMutation.mutate(t.name); }}>
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteTarget(t.name); }}>
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             ) : null },
           ]}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Topic"
+        description={`Are you sure you want to delete topic "${deleteTarget}"? This action cannot be undone.`}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); setDeleteTarget(null); }}
+        destructive
+      />
     </div>
   );
 }

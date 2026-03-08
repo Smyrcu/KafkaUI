@@ -8,12 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { DetailSkeleton } from "@/components/PageSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { RotateCcw, Users, Activity, Server } from "lucide-react";
+import { rowClassName } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export function ConsumerGroupDetailPage() {
   const { clusterName, groupName } = useParams<{ clusterName: string; groupName: string }>();
@@ -45,7 +48,7 @@ export function ConsumerGroupDetailPage() {
   ];
 
   if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
   if (!group) return null;
 
   const availableTopics = group.offsets.map(o => o.topic);
@@ -75,27 +78,28 @@ export function ConsumerGroupDetailPage() {
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
                     <Label>Topic</Label>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                      value={resetTopic}
-                      onChange={(e) => setResetTopic(e.target.value)}
-                    >
-                      <option value="">Select a topic...</option>
-                      {availableTopics.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
+                    <Select value={resetTopic} onValueChange={setResetTopic}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a topic..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableTopics.map(t => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label>Reset To</Label>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                      value={resetTo}
-                      onChange={(e) => setResetTo(e.target.value)}
-                    >
-                      <option value="earliest">Earliest</option>
-                      <option value="latest">Latest</option>
-                    </select>
+                    <Select value={resetTo} onValueChange={setResetTo}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="earliest">Earliest</SelectItem>
+                        <SelectItem value="latest">Latest</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <DialogFooter>
@@ -107,7 +111,7 @@ export function ConsumerGroupDetailPage() {
                   </Button>
                 </DialogFooter>
                 {resetMutation.isError && (
-                  <p className="text-sm text-destructive mt-2">{(resetMutation.error as Error).message}</p>
+                  <p className="text-sm text-destructive mt-2">{getErrorMessage(resetMutation.error)}</p>
                 )}
               </DialogContent>
             </Dialog>
@@ -141,7 +145,7 @@ export function ConsumerGroupDetailPage() {
               </TableHeader>
               <TableBody>
                 {group.members.map((m, i) => (
-                  <TableRow key={m.id} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                  <TableRow key={m.id} className={rowClassName(i)}>
                     <TableCell className="font-mono text-xs">{m.id}</TableCell>
                     <TableCell>{m.clientId}</TableCell>
                     <TableCell>{m.host}</TableCell>
@@ -177,7 +181,7 @@ export function ConsumerGroupDetailPage() {
               </TableHeader>
               <TableBody>
                 {topicOffset.partitions.map((p, i) => (
-                  <TableRow key={p.partition} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                  <TableRow key={p.partition} className={rowClassName(i)}>
                     <TableCell>
                       <Badge variant="outline">{p.partition}</Badge>
                     </TableCell>

@@ -282,8 +282,8 @@ export const api = {
     browse: (cluster: string, topic: string, params?: BrowseParams) => {
       const searchParams = new URLSearchParams();
       if (params?.partition !== undefined) searchParams.set('partition', String(params.partition));
-      if (params?.offset) searchParams.set('offset', params.offset);
-      if (params?.limit) searchParams.set('limit', String(params.limit));
+      if (params?.offset !== undefined && params?.offset !== '') searchParams.set('offset', params.offset);
+      if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
       if (params?.timestamp) searchParams.set('timestamp', params.timestamp);
       if (params?.filter) searchParams.set('filter', params.filter);
       const qs = searchParams.toString();
@@ -352,9 +352,9 @@ export const api = {
   admin: {
     listClusters: () => request<AdminClusterList>('/admin/clusters'),
     addCluster: (data: AddClusterRequest, validate = true) =>
-      request<AdminClusterInfo>(`/admin/clusters${validate ? '' : '?validate=false'}`, { method: 'POST', body: JSON.stringify(data) }),
+      request<{ status: string }>(`/admin/clusters${validate ? '' : '?validate=false'}`, { method: 'POST', body: JSON.stringify(data) }),
     updateCluster: (name: string, data: AddClusterRequest, validate = true) =>
-      request<AdminClusterInfo>(`/admin/clusters/${encodeURIComponent(name)}${validate ? '' : '?validate=false'}`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ status: string }>(`/admin/clusters/${encodeURIComponent(name)}${validate ? '' : '?validate=false'}`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteCluster: (name: string) =>
       request<{ status: string }>(`/admin/clusters/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     testConnection: (data: AddClusterRequest) =>

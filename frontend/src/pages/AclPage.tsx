@@ -14,6 +14,8 @@ import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
 import { Shield, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { getErrorMessage } from "@/lib/error-utils";
 
 interface ACLEntry {
   resourceType: string;
@@ -48,6 +50,7 @@ export function AclPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ACLEntry | null>(null);
   const [form, setForm] = useState(initialForm);
 
   const { data: acls, isLoading, error, refetch } = useQuery({
@@ -86,9 +89,7 @@ export function AclPage() {
   };
 
   const handleDelete = (entry: ACLEntry) => {
-    if (confirm("Are you sure you want to delete this ACL entry?")) {
-      deleteMutation.mutate(entry);
-    }
+    setDeleteTarget(entry);
   };
 
   const filteredAcls = acls?.filter((acl: ACLEntry) => {
@@ -108,7 +109,7 @@ export function AclPage() {
 
   if (isLoading) return <><PageHeader title="ACL Management" breadcrumbs={breadcrumbs} /><TableSkeleton cols={8} /></>;
   if (error) {
-    const msg = (error as Error).message;
+    const msg = getErrorMessage(error);
     const notConfigured = msg.toLowerCase().includes("not configured") || msg.toLowerCase().includes("no authorizer");
     return (
       <div>
@@ -116,7 +117,7 @@ export function AclPage() {
         {notConfigured ? (
           <EmptyState icon={Shield} title="ACL Management not available" description="No Authorizer is configured on the broker. Enable an authorizer in your Kafka broker configuration to manage access control lists." />
         ) : (
-          <ErrorAlert message={msg} onRetry={() => refetch()} />
+          <ErrorAlert error={error} onRetry={() => refetch()} />
         )}
       </div>
     );
@@ -220,7 +221,7 @@ export function AclPage() {
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
                 {createMutation.isError && (
-                  <ErrorAlert message={(createMutation.error as Error).message} />
+                  <ErrorAlert error={createMutation.error} />
                 )}
               </div>
             </DialogContent>
@@ -272,6 +273,14 @@ export function AclPage() {
           ]}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete ACL Entry"
+        description={`Are you sure you want to delete this ACL entry for principal "${deleteTarget?.principal}" on ${deleteTarget?.resourceType} "${deleteTarget?.resourceName}"?`}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); setDeleteTarget(null); }}
+        destructive
+      />
     </div>
   );
 }

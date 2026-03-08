@@ -15,6 +15,8 @@ import { DetailSkeleton } from "@/components/PageSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { Activity, PlugZap, Server, ListTodo } from "lucide-react";
 import { getConnectorStateBadgeVariant } from "@/lib/helpers";
+import { rowClassName } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export function ConnectorDetailPage() {
   const { clusterName, connectorName } = useParams<{ clusterName: string; connectorName: string }>();
@@ -68,7 +70,7 @@ export function ConnectorDetailPage() {
   ];
 
   if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
   if (!connector) return null;
 
   const isPaused = connector.state.toUpperCase() === "PAUSED";
@@ -143,7 +145,7 @@ export function ConnectorDetailPage() {
               </TableHeader>
               <TableBody>
                 {connector.tasks.map((task, i) => (
-                  <TableRow key={task.id} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                  <TableRow key={task.id} className={rowClassName(i)}>
                     <TableCell>{task.id}</TableCell>
                     <TableCell>
                       <Badge variant={getConnectorStateBadgeVariant(task.state)}>{task.state.toUpperCase()}</Badge>
@@ -183,7 +185,7 @@ export function ConnectorDetailPage() {
                   />
                   {updateConfigMutation.isError && (
                     <p className="text-sm text-destructive">
-                      {(updateConfigMutation.error as Error).message}
+                      {getErrorMessage(updateConfigMutation.error)}
                     </p>
                   )}
                   <div className="flex justify-end gap-2">
@@ -209,7 +211,7 @@ export function ConnectorDetailPage() {
             </TableHeader>
             <TableBody>
               {sortedConfigKeys.map((key, i) => (
-                <TableRow key={key} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                <TableRow key={key} className={rowClassName(i)}>
                   <TableCell className="font-mono text-sm">{key}</TableCell>
                   <TableCell className="font-mono text-sm break-all">{connector.config[key]}</TableCell>
                 </TableRow>

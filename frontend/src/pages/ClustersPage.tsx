@@ -16,7 +16,7 @@ export function ClustersPage() {
   });
 
   if (isLoading) return <><PageHeader title="Clusters" breadcrumbs={[{ label: "Dashboard", href: "/" }, { label: "Clusters" }]} /><TableSkeleton rows={3} cols={2} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
 
   return (
     <div>

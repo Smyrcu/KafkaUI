@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -13,15 +13,19 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
+import { useSearchFilter } from "@/hooks/useSearchFilter";
+import { getErrorMessage } from "@/lib/error-utils";
 import { PlugZap, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { ConnectorInfo } from "@/lib/api";
 import { getConnectorStateBadgeVariant } from "@/lib/helpers";
 
 export function KafkaConnectPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const connectorAccessor = useCallback((c: ConnectorInfo) => c.name, []);
   const [newConnectorName, setNewConnectorName] = useState("");
   const [newConnectorConfig, setNewConnectorConfig] = useState("");
 
@@ -67,9 +71,7 @@ export function KafkaConnectPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["connectors", clusterName] }),
   });
 
-  const filteredConnectors = connectors?.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const { search, setSearch, filtered: filteredConnectors } = useSearchFilter(connectors ?? [], connectorAccessor);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -79,7 +81,7 @@ export function KafkaConnectPage() {
 
   if (isLoading) return <><PageHeader title="Kafka Connect" breadcrumbs={breadcrumbs} /><TableSkeleton cols={6} /></>;
   if (error) {
-    const msg = (error as Error).message;
+    const msg = getErrorMessage(error);
     const notConfigured = msg.toLowerCase().includes("not configured");
     return (
       <div>
@@ -87,7 +89,7 @@ export function KafkaConnectPage() {
         {notConfigured ? (
           <EmptyState icon={PlugZap} title="Kafka Connect not configured" description="No Kafka Connect clusters are configured for this cluster. Add connect URLs to your cluster configuration to manage connectors." />
         ) : (
-          <ErrorAlert message={msg} onRetry={() => refetch()} />
+          <ErrorAlert error={error} onRetry={() => refetch()} />
         )}
       </div>
     );
@@ -140,7 +142,7 @@ export function KafkaConnectPage() {
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
                 {createMutation.isError && (
-                  <ErrorAlert message={(createMutation.error as Error).message} />
+                  <ErrorAlert error={createMutation.error} />
                 )}
               </form>
             </DialogContent>
@@ -196,7 +198,7 @@ export function KafkaConnectPage() {
                       Resume
                     </Button>
                   )}
-                  <Button variant="destructive" size="sm" disabled={deleteMutation.isPending} onClick={(e) => { e.stopPropagation(); if (confirm(`Delete connector "${c.name}"?`)) deleteMutation.mutate(c.name); }}>
+                  <Button variant="destructive" size="sm" disabled={deleteMutation.isPending} onClick={(e) => { e.stopPropagation(); setDeleteTarget(c.name); }}>
                     Delete
                   </Button>
                 </div>
@@ -205,6 +207,14 @@ export function KafkaConnectPage() {
           ]}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Connector"
+        description={`Are you sure you want to delete connector "${deleteTarget}"? This action cannot be undone.`}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); setDeleteTarget(null); }}
+        destructive
+      />
     </div>
   );
 }

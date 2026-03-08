@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown, WifiOff, Calendar, ChevronDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { getErrorMessage } from "@/lib/error-utils";
 
 const PRESETS = [
   { key: "live", shorthand: "LIVE", label: "Live", duration: "live", live: true },
@@ -396,7 +397,7 @@ export function MetricsPage() {
   if (isLoading) return <TableSkeleton rows={3} cols={4} />;
 
   if (error) {
-    const msg = (error as Error).message;
+    const msg = getErrorMessage(error);
     if (msg.includes("not configured")) {
       return (
         <div>
@@ -415,7 +416,7 @@ export function MetricsPage() {
         </div>
       );
     }
-    return <ErrorAlert message={msg} onRetry={() => refetch()} />;
+    return <ErrorAlert error={error} onRetry={() => refetch()} />;
   }
 
   const brokers = data?.brokers ?? [];

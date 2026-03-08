@@ -23,7 +23,12 @@ export function useWebSocket(url: string | null) {
     };
 
     ws.onmessage = (event) => {
-      const msg: MessageRecord = JSON.parse(event.data);
+      let msg: MessageRecord;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
       setMessages((prev) => [msg, ...prev].slice(0, 1000));
     };
 

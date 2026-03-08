@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { DetailSkeleton } from "@/components/PageSkeleton";
 import { Layers, Hash, FileText } from "lucide-react";
+import { rowClassName } from "@/lib/utils";
 
 function formatSchema(raw: string): string {
   try {
@@ -39,7 +40,7 @@ export function SchemaDetailPage() {
   ];
 
   if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
   if (!schema) return null;
 
   const sortedVersions = [...schema.versions].sort((a, b) => b.version - a.version);
@@ -78,7 +79,7 @@ export function SchemaDetailPage() {
             </TableHeader>
             <TableBody>
               {sortedVersions.map((v, i) => (
-                <TableRow key={v.version} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                <TableRow key={v.version} className={rowClassName(i)}>
                   <TableCell>
                     <Badge variant={v.version === activeVersion ? "default" : "outline"}>{v.version}</Badge>
                   </TableCell>

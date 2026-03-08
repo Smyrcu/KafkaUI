@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -13,7 +13,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
+import { useSearchFilter } from "@/hooks/useSearchFilter";
 import { UserCog, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface ScramUser {
   name: string;
@@ -33,8 +35,9 @@ const initialForm = {
 export function UsersPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ScramUser | null>(null);
+  const userAccessor = useCallback((user: ScramUser) => user.name, []);
   const [form, setForm] = useState(initialForm);
 
   const { data: users, isLoading, error, refetch } = useQuery({
@@ -72,14 +75,10 @@ export function UsersPage() {
   };
 
   const handleDelete = (user: ScramUser) => {
-    if (confirm(`Delete SCRAM credentials for "${user.name}" (${user.mechanism})?`)) {
-      deleteMutation.mutate({ name: user.name, mechanism: user.mechanism });
-    }
+    setDeleteTarget(user);
   };
 
-  const filteredUsers = users?.filter((user: ScramUser) =>
-    user.name.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const { search, setSearch, filtered: filteredUsers } = useSearchFilter(users ?? [] as ScramUser[], userAccessor);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -89,11 +88,10 @@ export function UsersPage() {
 
   if (isLoading) return <><PageHeader title="Users" breadcrumbs={breadcrumbs} /><TableSkeleton cols={4} /></>;
   if (error) {
-    const msg = (error as Error).message;
     return (
       <div>
         <PageHeader title="Users" breadcrumbs={breadcrumbs} />
-        <ErrorAlert message={msg} onRetry={() => refetch()} />
+        <ErrorAlert error={error} onRetry={() => refetch()} />
       </div>
     );
   }
@@ -157,7 +155,7 @@ export function UsersPage() {
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
                 {createMutation.isError && (
-                  <ErrorAlert message={(createMutation.error as Error).message} />
+                  <ErrorAlert error={createMutation.error} />
                 )}
               </div>
             </DialogContent>
@@ -196,6 +194,14 @@ export function UsersPage() {
           ]}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete SCRAM Credentials"
+        description={`Are you sure you want to delete SCRAM credentials for "${deleteTarget?.name}" (${deleteTarget?.mechanism})? This action cannot be undone.`}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate({ name: deleteTarget.name, mechanism: deleteTarget.mechanism }); setDeleteTarget(null); }}
+        destructive
+      />
     </div>
   );
 }
