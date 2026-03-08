@@ -1,0 +1,26 @@
+KafkaUI has been deployed!
+
+{{- if .Values.ingress.enabled }}
+
+Access the UI at: http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}
+
+{{- else if contains "NodePort" .Values.service.type }}
+
+Get the URL by running:
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "kafkaui.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+
+{{- else if contains "LoadBalancer" .Values.service.type }}
+
+Get the URL by running:
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "kafkaui.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+
+{{- else }}
+
+Forward the port to access the UI:
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "kafkaui.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  echo http://localhost:{{ .Values.service.port }}
+
+{{- end }}
