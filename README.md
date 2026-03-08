@@ -6,8 +6,9 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 
 - Cluster management (multi-cluster support)
 - Broker information and monitoring
+- Broker metrics (JMX via Prometheus endpoint scraping)
 - Topic CRUD (create, configure, delete)
-- Message browsing with filters (partition, offset, timestamp)
+- Message browsing with filters (partition, offset, timestamp, CEL expressions)
 - Message producing
 - Download messages as JSON
 - Live tail via WebSocket (real-time message streaming)
@@ -38,7 +39,8 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 
 ### Docker Compose
 
-The fastest way to get started. Launches Kafka and KafkaUI together, preconfigured:
+The fastest way to get started. Launches Kafka and KafkaUI together, preconfigured.
+The Docker Compose setup uses `config.docker.yaml` (mounted into the container):
 
 ```bash
 docker compose up --build
@@ -105,6 +107,7 @@ Edit `config.yaml` to point to your Kafka broker(s).
 ### Dev URLs
 
 - Frontend (Vite HMR): http://localhost:5173
+- Settings (cluster management): http://localhost:5173/settings/clusters
 - Backend API: http://localhost:8080
 - Swagger UI: http://localhost:8080/api/v1/docs
 
@@ -120,7 +123,7 @@ server:
 # Basic auth (login/password)
 auth:
   enabled: true
-  type: basic
+  types: [basic]
   basic:
     users:
       - username: admin
@@ -143,16 +146,19 @@ auth:
       clusters: [production]
       actions: [view_topics, view_messages, view_users]
 
-# Or OIDC auth
+# Or OIDC auth (supports multiple providers)
 # auth:
 #   enabled: true
-#   type: oidc
+#   types: [oidc]
 #   oidc:
-#     issuer: https://accounts.example.com
-#     client-id: kafkaui
-#     client-secret: ${OIDC_CLIENT_SECRET}
-#     scopes: [openid, profile, email]
 #     redirect-url: http://localhost:8080/api/v1/auth/callback
+#     providers:
+#       - name: google
+#         display-name: Google
+#         issuer: https://accounts.google.com
+#         client-id: kafkaui
+#         client-secret: ${OIDC_CLIENT_SECRET}
+#         scopes: [openid, profile, email]
 
 clusters:
   - name: production
@@ -171,6 +177,8 @@ clusters:
         url: http://kafka-connect:8083
     ksql:
       url: http://ksqldb:8088
+    metrics:
+      url: http://{host}:7071/metrics  # Prometheus JMX exporter endpoint ({host} replaced per broker)
 
   - name: staging
     bootstrap-servers: staging-kafka:9092
