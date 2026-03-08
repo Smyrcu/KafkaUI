@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Layers,
   BarChart3,
+  Settings,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import {
@@ -95,6 +96,18 @@ export function AppSidebar() {
                   <Link to="/clusters">
                     <Layers className="h-4 w-4" />
                     <span>Clusters</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname.startsWith("/settings")}
+                  tooltip="Settings"
+                >
+                  <Link to="/settings/clusters">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
