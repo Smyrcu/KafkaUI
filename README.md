@@ -9,6 +9,7 @@ A modern web UI for Apache Kafka. Go backend with embedded React frontend, shipp
 - Topic CRUD (create, configure, delete)
 - Message browsing with filters (partition, offset, timestamp)
 - Message producing
+- Download messages as JSON
 - Live tail via WebSocket (real-time message streaming)
 - Consumer Groups (list, details, reset offsets)
 - Schema Registry integration (list, create, delete schemas -- AVRO, JSON, Protobuf)
