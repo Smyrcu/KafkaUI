@@ -1,11 +1,12 @@
-# Kafka with JMX Prometheus exporter for real metrics testing.
+# Full dev environment: Kafka + Schema Registry + Kafka Connect + JMX metrics.
 #
-# Setup:
-#   1. Download jmx_prometheus_javaagent.jar into dev/jmx-exporter/:
-#      curl -L -o dev/jmx-exporter/jmx_prometheus_javaagent.jar \
-#        https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
-#   2. docker compose -f docker-compose.dev.yaml up -d
-#   3. Update config.yaml metrics URL to: http://{host}:9404/metrics
+# Usage:
+#   make dev-env      # starts all services + seeds test data
+#   make dev          # starts Go backend + Vite frontend
+#
+# Or manually:
+#   docker compose -f docker-compose.dev.yaml up -d
+#   ./scripts/seed-dev.sh
 #
 services:
   kafka:
@@ -22,6 +23,48 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_SUPER_USERS: User:ANONYMOUS
       KAFKA_OPTS: "-javaagent:/opt/jmx-exporter/jmx_prometheus_javaagent.jar=9404:/opt/jmx-exporter/kafka.yaml"
     volumes:
       - ./dev/jmx-exporter:/opt/jmx-exporter
+    healthcheck:
+      test: /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  schema-registry:
+    image: docker.io/confluentinc/cp-schema-registry:7.7.1
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  kafka-connect:
+    image: docker.io/confluentinc/cp-kafka-connect:7.7.1
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: kafkaui-connect
+      CONNECT_CONFIG_STORAGE_TOPIC: _connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: _connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: _connect-status
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+    depends_on:
+      kafka:
+        condition: service_healthy

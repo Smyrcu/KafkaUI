@@ -28,6 +28,10 @@ config.test-*.yaml
 # Design plans (may contain internal notes)
 docs/plans/
 
+# Dev environment artifacts
+dev/jmx-exporter/*.jar
+dev/kafka-config/
+
 # Environment
 .env
 .env.*
