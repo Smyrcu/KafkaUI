@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
@@ -22,6 +23,10 @@ func (h *ACLHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	acls, err := client.ListACLs(r.Context())
 	if err != nil {
+		if strings.Contains(err.Error(), "No Authorizer") {
+			writeError(w, http.StatusBadRequest, "ACL management is not available: no authorizer is configured on the broker")
+			return
+		}
 		writeInternalError(w, "listing ACLs", err)
 		return
 	}
@@ -69,6 +74,10 @@ func (h *ACLHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.CreateACL(r.Context(), entry); err != nil {
+		if strings.Contains(err.Error(), "No Authorizer") {
+			writeError(w, http.StatusBadRequest, "ACL management is not available: no authorizer is configured on the broker")
+			return
+		}
 		writeInternalError(w, "creating ACL", err)
 		return
 	}
@@ -97,6 +106,10 @@ func (h *ACLHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteACL(r.Context(), entry); err != nil {
+		if strings.Contains(err.Error(), "No Authorizer") {
+			writeError(w, http.StatusBadRequest, "ACL management is not available: no authorizer is configured on the broker")
+			return
+		}
 		writeInternalError(w, "deleting ACL", err)
 		return
 	}
