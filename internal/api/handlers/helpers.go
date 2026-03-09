@@ -22,7 +22,8 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-func writeInternalError(w http.ResponseWriter) {
+func writeInternalError(w http.ResponseWriter, msg string, err error) {
+	slog.Error(msg, "error", err)
 	writeError(w, http.StatusInternalServerError, "internal server error")
 }
 
@@ -35,7 +36,7 @@ func getClient(reg *kafka.Registry, w http.ResponseWriter, r *http.Request) (*ka
 	return client, ok
 }
 
-func decodeBody(w http.ResponseWriter, r *http.Request, dest interface{}) bool {
+func decodeBody(w http.ResponseWriter, r *http.Request, dest any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dest); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return false

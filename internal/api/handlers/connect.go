@@ -39,6 +39,9 @@ func (h *ConnectHandler) getConnectClients(w http.ResponseWriter, r *http.Reques
 
 // findConnector locates a connector by name across all connect clusters.
 func (h *ConnectHandler) findConnector(ctx context.Context, clients []*connect.Client, connectorName string) (*connect.Client, *connect.ConnectorDetail, error) {
+	if len(clients) == 0 {
+		return nil, nil, fmt.Errorf("connector %q not found: no connect clusters configured", connectorName)
+	}
 	var lastErr error
 	for _, client := range clients {
 		detail, err := client.GetConnector(ctx, connectorName)
@@ -60,7 +63,7 @@ func (h *ConnectHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, client := range clients {
 		connectors, err := client.ListConnectors(r.Context())
 		if err != nil {
-			writeInternalError(w)
+			writeInternalError(w, "listing connectors", err)
 			return
 		}
 		allConnectors = append(allConnectors, connectors...)
@@ -107,13 +110,13 @@ func (h *ConnectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(clients) == 0 {
-		writeInternalError(w)
+		writeInternalError(w, "no connect clients available", fmt.Errorf("empty connect clients"))
 		return
 	}
 
 	result, err := clients[0].CreateConnector(r.Context(), req)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating connector", err)
 		return
 	}
 
@@ -141,7 +144,7 @@ func (h *ConnectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.UpdateConnector(r.Context(), connectorName, config)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "updating connector", err)
 		return
 	}
 
@@ -163,7 +166,7 @@ func (h *ConnectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteConnector(r.Context(), connectorName); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "deleting connector", err)
 		return
 	}
 
@@ -188,7 +191,7 @@ func (h *ConnectHandler) connectorAction(w http.ResponseWriter, r *http.Request,
 	}
 
 	if err := fn(r.Context(), connectClient, connectorName); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "connector action failed", err)
 		return
 	}
 

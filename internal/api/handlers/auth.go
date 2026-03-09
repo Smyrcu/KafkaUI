@@ -80,7 +80,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.sessions.CreateSession(w, r, *session); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating session", err)
 		return
 	}
 
@@ -170,7 +170,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	userInfo, rawToken, err := provider.Exchange(r.Context(), code)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "exchanging OIDC code", err)
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Name:  userInfo.Name,
 		Roles: userInfo.Roles,
 	}); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating OIDC session", err)
 		return
 	}
 

@@ -24,7 +24,7 @@ func (h *ConsumerGroupHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	groups, err := client.ConsumerGroups(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing consumer groups", err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *ConsumerGroupHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 	detail, err := client.ConsumerGroupDetails(r.Context(), groupName)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "fetching consumer group details", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *ConsumerGroupHandler) ResetOffsets(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := client.ResetConsumerGroupOffsets(r.Context(), groupName, req); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "resetting consumer group offsets", err)
 		return
 	}
 

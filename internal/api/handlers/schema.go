@@ -39,7 +39,7 @@ func (h *SchemaHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	subjects, err := client.ListSubjects(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing schemas", err)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *SchemaHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 	details, err := client.GetSubjectDetails(r.Context(), subject)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "fetching schema details", err)
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *SchemaHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.CreateSchema(r.Context(), req)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating schema", err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *SchemaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteSubject(r.Context(), subject); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "deleting schema", err)
 		return
 	}
 

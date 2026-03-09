@@ -87,7 +87,7 @@ func (sm *SessionManager) GetSession(r *http.Request) (*SessionData, error) {
 		return nil, fmt.Errorf("decoding session data: %w", err)
 	}
 
-	if data.CreatedAt > 0 && time.Now().Unix()-data.CreatedAt > int64(sm.maxAge) {
+	if data.CreatedAt == 0 || time.Now().Unix()-data.CreatedAt > int64(sm.maxAge) {
 		return nil, fmt.Errorf("session expired")
 	}
 

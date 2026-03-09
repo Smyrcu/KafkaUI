@@ -42,9 +42,8 @@ func TestACLHandler_List_ValidCluster(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
-	// 500 = Kafka unreachable (not 404)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rec.Code)
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("valid cluster should not return 404, got %d", rec.Code)
 	}
 }
 

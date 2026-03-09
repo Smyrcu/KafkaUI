@@ -24,7 +24,7 @@ func (h *TopicHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	topics, err := client.Topics(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing topics", err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *TopicHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 	detail, err := client.TopicDetails(r.Context(), topicName)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "fetching topic details", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *TopicHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.CreateTopic(r.Context(), req); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating topic", err)
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *TopicHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteTopic(r.Context(), topicName); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "deleting topic", err)
 		return
 	}
 

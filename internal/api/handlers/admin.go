@@ -118,12 +118,12 @@ func (h *AdminHandler) AddCluster(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.dynamicCfg.Add(cc); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "saving dynamic config", err)
 		return
 	}
 
 	if err := h.registry.AddCluster(cc); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "registering cluster", err)
 		return
 	}
 
@@ -160,12 +160,12 @@ func (h *AdminHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.dynamicCfg.Update(name, cc); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "updating dynamic config", err)
 		return
 	}
 
 	if err := h.registry.UpdateCluster(name, cc); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "updating cluster", err)
 		return
 	}
 
@@ -186,12 +186,12 @@ func (h *AdminHandler) DeleteCluster(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.dynamicCfg.Remove(name); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "removing dynamic config", err)
 		return
 	}
 
 	if err := h.registry.RemoveCluster(name); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "removing cluster", err)
 		return
 	}
 

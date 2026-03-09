@@ -106,7 +106,7 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := client.ConsumeMessages(ctx, topicName, req)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "consuming messages", err)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *MessageHandler) Produce(w http.ResponseWriter, r *http.Request) {
 
 	record, err := client.ProduceMessage(r.Context(), topicName, req)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "producing message", err)
 		return
 	}
 

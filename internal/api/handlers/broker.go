@@ -22,7 +22,7 @@ func (h *BrokerHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	brokers, err := client.Brokers(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing brokers", err)
 		return
 	}
 

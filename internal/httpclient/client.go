@@ -14,22 +14,22 @@ import (
 // encoding, response decoding, and error formatting with configurable
 // content types and error prefixes.
 type Client struct {
-	BaseURL     string
-	HTTPClient  *http.Client
-	ContentType string
-	Accept      string
-	ErrorPrefix string
+	baseURL     string
+	httpClient  *http.Client
+	contentType string
+	accept      string
+	errorPrefix string
 }
 
 // New creates a Client with the given settings. The baseURL should not have a
 // trailing slash (callers are expected to trim it before passing).
 func New(baseURL string, timeout time.Duration, contentType, accept, errorPrefix string) *Client {
 	return &Client{
-		BaseURL:     baseURL,
-		HTTPClient:  &http.Client{Timeout: timeout},
-		ContentType: contentType,
-		Accept:      accept,
-		ErrorPrefix: errorPrefix,
+		baseURL:     baseURL,
+		httpClient:  &http.Client{Timeout: timeout},
+		contentType: contentType,
+		accept:      accept,
+		errorPrefix: errorPrefix,
 	}
 }
 
@@ -46,19 +46,19 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 		bodyReader = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	if c.Accept != "" {
-		req.Header.Set("Accept", c.Accept)
+	if c.accept != "" {
+		req.Header.Set("Accept", c.accept)
 	}
 	if body != nil {
-		req.Header.Set("Content-Type", c.ContentType)
+		req.Header.Set("Content-Type", c.contentType)
 	}
 
-	resp, err := c.HTTPClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("%s (%d): %s", c.ErrorPrefix, resp.StatusCode, string(respBody))
+		return fmt.Errorf("%s (%d): %s", c.errorPrefix, resp.StatusCode, string(respBody))
 	}
 
 	if dest != nil {
@@ -86,19 +86,19 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 // useful when the caller needs to handle non-standard JSON structures or
 // needs the raw bytes for custom unmarshalling.
 func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, body)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
-	if c.Accept != "" {
-		req.Header.Set("Accept", c.Accept)
+	if c.accept != "" {
+		req.Header.Set("Accept", c.accept)
 	}
 	if body != nil {
-		req.Header.Set("Content-Type", c.ContentType)
+		req.Header.Set("Content-Type", c.contentType)
 	}
 
-	resp, err := c.HTTPClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("%s (%d): %s", c.ErrorPrefix, resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("%s (%d): %s", c.errorPrefix, resp.StatusCode, string(respBody))
 	}
 
 	return respBody, nil

@@ -22,7 +22,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	users, err := client.ListScramUsers(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing users", err)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.UpsertScramUser(r.Context(), req); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating user", err)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteScramUser(r.Context(), req.Name, req.Mechanism); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "deleting user", err)
 		return
 	}
 

@@ -49,7 +49,7 @@ func (h *KsqlHandler) Execute(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.Execute(r.Context(), req.Query)
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "executing ksql query", err)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *KsqlHandler) Info(w http.ResponseWriter, r *http.Request) {
 
 	info, err := client.Info(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "fetching ksql info", err)
 		return
 	}
 

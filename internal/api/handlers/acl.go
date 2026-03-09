@@ -22,7 +22,7 @@ func (h *ACLHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	acls, err := client.ListACLs(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing ACLs", err)
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *ACLHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.CreateACL(r.Context(), entry); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "creating ACL", err)
 		return
 	}
 
@@ -97,7 +97,7 @@ func (h *ACLHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteACL(r.Context(), entry); err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "deleting ACL", err)
 		return
 	}
 

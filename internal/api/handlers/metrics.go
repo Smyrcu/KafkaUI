@@ -72,7 +72,7 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 
 	brokers, err := client.Brokers(r.Context())
 	if err != nil {
-		writeInternalError(w)
+		writeInternalError(w, "listing brokers for metrics", err)
 		return
 	}
 
