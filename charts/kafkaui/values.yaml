@@ -54,6 +54,18 @@ ingress:
   host: kafkaui.local
   tls: []
 
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Node selector for pod scheduling
+nodeSelector: {}
+
+# Tolerations for pod scheduling
+tolerations: []
+
+# Affinity rules for pod scheduling
+affinity: {}
+
 # CPU/memory resource requests and limits
 resources: {}
 
