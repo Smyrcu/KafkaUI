@@ -278,7 +278,7 @@ export function AclPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete ACL Entry"
         description={`Are you sure you want to delete this ACL entry for principal "${deleteTarget?.principal}" on ${deleteTarget?.resourceType} "${deleteTarget?.resourceName}"?`}
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); setDeleteTarget(null); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) }); }}
         destructive
       />
     </div>

@@ -123,7 +123,7 @@ export function TopicsPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete Topic"
         description={`Are you sure you want to delete topic "${deleteTarget}"? This action cannot be undone.`}
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); setDeleteTarget(null); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) }); }}
         destructive
       />
     </div>

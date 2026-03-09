@@ -199,7 +199,7 @@ export function UsersPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete SCRAM Credentials"
         description={`Are you sure you want to delete SCRAM credentials for "${deleteTarget?.name}" (${deleteTarget?.mechanism})? This action cannot be undone.`}
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate({ name: deleteTarget.name, mechanism: deleteTarget.mechanism }); setDeleteTarget(null); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate({ name: deleteTarget.name, mechanism: deleteTarget.mechanism }, { onSuccess: () => setDeleteTarget(null) }); }}
         destructive
       />
     </div>
