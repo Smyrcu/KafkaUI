@@ -212,7 +212,7 @@ export function KafkaConnectPage() {
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete Connector"
         description={`Are you sure you want to delete connector "${deleteTarget}"? This action cannot be undone.`}
-        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget, { onSuccess: () => setDeleteTarget(null) }); }}
+        onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); }}
         destructive
       />
     </div>

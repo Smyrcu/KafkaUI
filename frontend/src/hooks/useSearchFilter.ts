@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 
 /**
- * Generic search filter hook. The accessor must be wrapped in useCallback
- * to prevent unnecessary re-filtering on every render.
+ * Generic search filter hook. The accessor should be stable (e.g. wrapped
+ * in useCallback) to avoid re-filtering on every render.
  */
 export function useSearchFilter<T>(items: T[], accessor: (item: T) => string) {
   const [search, setSearch] = useState("");

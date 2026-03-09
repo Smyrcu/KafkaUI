@@ -109,11 +109,6 @@ func (h *ConnectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(clients) == 0 {
-		writeInternalError(w, "no connect clients available", fmt.Errorf("empty connect clients"))
-		return
-	}
-
 	result, err := clients[0].CreateConnector(r.Context(), req)
 	if err != nil {
 		writeInternalError(w, "creating connector", err)
@@ -191,7 +186,7 @@ func (h *ConnectHandler) connectorAction(w http.ResponseWriter, r *http.Request,
 	}
 
 	if err := fn(r.Context(), connectClient, connectorName); err != nil {
-		writeInternalError(w, "connector action failed", err)
+		writeInternalError(w, "performing connector action", err)
 		return
 	}
 

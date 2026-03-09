@@ -13,11 +13,11 @@ type loginAttempt struct {
 // LoginRateLimiter tracks login attempts per key (IP address)
 // using a simple fixed-window counter.
 type LoginRateLimiter struct {
-	mu          sync.Mutex
-	attempts    map[string]*loginAttempt
-	maxAttempts int
-	window      time.Duration
-	sweepCounter   int
+	mu           sync.Mutex
+	attempts     map[string]*loginAttempt
+	maxAttempts  int
+	window       time.Duration
+	sweepCounter int
 }
 
 // NewLoginRateLimiter creates a rate limiter that allows maxAttempts

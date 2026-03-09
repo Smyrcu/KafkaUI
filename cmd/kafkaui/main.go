@@ -167,7 +167,7 @@ func initMetrics(cfg *config.Config, registry *kafka.Registry, logger *slog.Logg
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
-	dynamicConfigPath := flag.String("dynamic-config", "", "path to dynamic config file (default: <config-dir>/dynamic.yaml)")
+	dynamicConfigPath := flag.String("dynamic-config", "", "path to dynamic config file; if empty, uses <config-dir>/dynamic.yaml")
 	flag.Parse()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
