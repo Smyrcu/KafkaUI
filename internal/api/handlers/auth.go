@@ -51,7 +51,8 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 
 	ip := r.RemoteAddr
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		ip = fwd
+		parts := strings.Split(fwd, ",")
+		ip = strings.TrimSpace(parts[len(parts)-1])
 	}
 	if !h.rateLimiter.Allow(ip) {
 		h.logger.Warn("login rate limited", "ip", ip)
@@ -186,7 +187,10 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	redirectURI := "/"
 	if redirectCookie, err := r.Cookie("redirect_uri"); err == nil && redirectCookie.Value != "" {
-		redirectURI = redirectCookie.Value
+		uri := redirectCookie.Value
+		if strings.HasPrefix(uri, "/") && !strings.HasPrefix(uri, "//") {
+			redirectURI = uri
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "redirect_uri",
 			Value:    "",
