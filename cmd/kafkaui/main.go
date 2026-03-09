@@ -167,6 +167,7 @@ func initMetrics(cfg *config.Config, registry *kafka.Registry, logger *slog.Logg
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
+	dynamicConfigPath := flag.String("dynamic-config", "", "path to dynamic config file (default: <config-dir>/dynamic.yaml)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -186,8 +187,11 @@ func main() {
 	}
 
 	// Load and merge dynamic clusters
-	dynamicPath := filepath.Join(filepath.Dir(*configPath), "dynamic.yaml")
-	dynamicCfg := config.NewDynamicConfig(dynamicPath)
+	dynPath := *dynamicConfigPath
+	if dynPath == "" {
+		dynPath = filepath.Join(filepath.Dir(*configPath), "dynamic.yaml")
+	}
+	dynamicCfg := config.NewDynamicConfig(dynPath)
 	mergeDynamicClusters(cfg, dynamicCfg, logger)
 
 	registry, err := kafka.NewRegistry(cfg)
@@ -244,7 +248,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", router)
 	mux.Handle("/ws/", router)
-	mux.Handle("/debug/", router)
 	mux.Handle("/healthz", router)
 	mux.Handle("/readyz", router)
 	mux.Handle("/readyz/", router)

@@ -72,7 +72,7 @@ docker run -p 8080:8080 -v $(pwd)/config.yaml:/etc/kafkaui/config.yaml kafkaui
 
 ```bash
 helm install kafkaui charts/kafkaui \
-  --set config="$(cat config.yaml)"
+  --set-file config=config.yaml
 ```
 
 See [`charts/kafkaui/values.yaml`](charts/kafkaui/values.yaml) for all options (ingress, persistence, resources).
@@ -144,7 +144,7 @@ auth:
       actions: ["*"]
     - role: viewer
       clusters: [production]
-      actions: [view_topics, view_messages, view_users]
+      actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
 
 # Or OIDC auth (supports multiple providers)
 # auth:
@@ -159,6 +159,9 @@ auth:
 #         client-id: kafkaui
 #         client-secret: ${OIDC_CLIENT_SECRET}
 #         scopes: [openid, profile, email]
+#   session:
+#     secret: ${SESSION_SECRET}
+#     max-age: 86400
 
 clusters:
   - name: production
@@ -178,7 +181,7 @@ clusters:
     ksql:
       url: http://ksqldb:8088
     metrics:
-      url: http://{host}:7071/metrics  # Prometheus JMX exporter endpoint ({host} replaced per broker)
+      url: http://{host}:9404/metrics  # Prometheus JMX exporter endpoint ({host} replaced per broker)
 
   - name: staging
     bootstrap-servers: staging-kafka:9092

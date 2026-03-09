@@ -39,6 +39,8 @@ spec:
           args:
             - --config
             - /etc/kafkaui/config.yaml
+            - --dynamic-config
+            - /data/dynamic.yaml
           ports:
             - name: http
               containerPort: 8080
@@ -67,10 +69,8 @@ spec:
             - name: config
               mountPath: /etc/kafkaui
               readOnly: true
-            {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: /data
-            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -82,11 +82,13 @@ spec:
         - name: config
           configMap:
             name: {{ include "kafkaui.fullname" . }}
-        {{- if .Values.persistence.enabled }}
         - name: data
+          {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
             claimName: {{ include "kafkaui.fullname" . }}
-        {{- end }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

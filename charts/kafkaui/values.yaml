@@ -1,22 +1,28 @@
+# Number of KafkaUI replicas. Use 1 when persistence is enabled (Recreate strategy).
 replicaCount: 1
 
+# Container image settings
 image:
   repository: kafkaui
-  tag: ""
+  tag: ""            # Defaults to Chart.appVersion
   pullPolicy: IfNotPresent
 
 nameOverride: ""
 fullnameOverride: ""
 
+# Kubernetes ServiceAccount configuration
 serviceAccount:
   create: true
-  name: ""
+  name: ""           # Defaults to fullname
   annotations: {}
 
+# Pod-level security context (applies to all containers)
 podSecurityContext:
   runAsNonRoot: true
+  runAsGroup: 65534
   fsGroup: 65534
 
+# Container-level security context
 securityContext:
   runAsUser: 65534
   readOnlyRootFilesystem: true
@@ -25,11 +31,14 @@ securityContext:
     drop:
       - ALL
 
+# Extra environment variables (list of {name, value} or {name, valueFrom})
 env: []
+# Extra envFrom sources (configMapRef, secretRef)
 envFrom: []
 
 podAnnotations: {}
 
+# Additional volumes and volume mounts for the container
 extraVolumes: []
 extraVolumeMounts: []
 
@@ -37,6 +46,7 @@ service:
   type: ClusterIP
   port: 8080
 
+# Ingress configuration
 ingress:
   enabled: false
   className: ""
@@ -44,13 +54,17 @@ ingress:
   host: kafkaui.local
   tls: []
 
+# CPU/memory resource requests and limits
 resources: {}
 
+# Persistent storage for dynamic cluster config. When disabled, an emptyDir is used.
 persistence:
   enabled: false
   size: 100Mi
   storageClass: ""
 
+# KafkaUI configuration (YAML). Mounted as /etc/kafkaui/config.yaml.
+# Use --set-file config=config.yaml to load from a file.
 config: |
   server:
     port: 8080
