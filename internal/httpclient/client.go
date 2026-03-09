@@ -64,7 +64,8 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxResponseBody = 16 << 20 // 16 MB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return fmt.Errorf("read response body: %w", err)
 	}
@@ -104,7 +105,8 @@ func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader)
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxResponseBody = 16 << 20 // 16 MB
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
