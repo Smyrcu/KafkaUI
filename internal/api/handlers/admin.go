@@ -209,7 +209,7 @@ func (h *AdminHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	if err := testConnection(cc); err != nil {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status": "error",
-			"error":  err.Error(),
+			"error":  "connection failed: unable to reach broker",
 		})
 		return
 	}

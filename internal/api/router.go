@@ -24,7 +24,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		MaxAge:           300,
 	}))
-	r.Use(middleware.MaxBodySize(1 << 20))
+	r.Use(middleware.MaxBodySize(5 << 20))
 
 	clusterHandler := handlers.NewClusterHandler(deps.Registry)
 	brokerHandler := handlers.NewBrokerHandler(deps.Registry)

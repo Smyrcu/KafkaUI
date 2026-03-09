@@ -82,7 +82,7 @@ func (h *ConnectHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 	_, detail, err := h.findConnector(r.Context(), clients, connectorName)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		writeError(w, http.StatusNotFound, "connector not found")
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *ConnectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	client, _, err := h.findConnector(r.Context(), clients, connectorName)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		writeError(w, http.StatusNotFound, "connector not found")
 		return
 	}
 
@@ -156,7 +156,7 @@ func (h *ConnectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	client, _, err := h.findConnector(r.Context(), clients, connectorName)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		writeError(w, http.StatusNotFound, "connector not found")
 		return
 	}
 
@@ -181,12 +181,12 @@ func (h *ConnectHandler) connectorAction(w http.ResponseWriter, r *http.Request,
 
 	connectClient, _, err := h.findConnector(r.Context(), clients, connectorName)
 	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+		writeError(w, http.StatusNotFound, "connector not found")
 		return
 	}
 
 	if err := fn(r.Context(), connectClient, connectorName); err != nil {
-		writeInternalError(w, "performing connector action", err)
+		writeInternalError(w, actionName+" connector", err)
 		return
 	}
 

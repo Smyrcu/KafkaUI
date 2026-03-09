@@ -116,7 +116,7 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(5 * time.Minute / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 	})
 
 	http.Redirect(w, r, provider.AuthCodeURL(state), http.StatusTemporaryRedirect)

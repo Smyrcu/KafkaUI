@@ -146,7 +146,7 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 				ID:      broker.ID,
 				Host:    display,
 				History: h.store.Query(key, duration),
-				Error:   latest[i].err.Error(),
+				Error:   "scrape failed",
 			}
 			continue
 		}

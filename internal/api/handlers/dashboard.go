@@ -104,9 +104,7 @@ func (h *DashboardHandler) getClusterStats(ctx context.Context, name string, cli
 	if err == nil {
 		overview.ConsumerGroups = len(groups)
 	} else {
-		if overview.Status != "degraded" {
-			overview.Status = "degraded"
-		}
+		overview.Status = "degraded"
 	}
 
 	return overview

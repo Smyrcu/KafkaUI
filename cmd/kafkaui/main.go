@@ -130,7 +130,7 @@ func initBasicAuth(cfg *config.Config, logger *slog.Logger) (*auth.BasicAuthenti
 
 // initMetrics creates per-cluster metrics scrapers, a shared store, and
 // starts the background collector if any scrapers are configured.
-func initMetrics(cfg *config.Config, registry *kafka.Registry, logger *slog.Logger) (map[string]*metrics.Scraper, *metrics.Store) {
+func initMetrics(ctx context.Context, cfg *config.Config, registry *kafka.Registry, logger *slog.Logger) (map[string]*metrics.Scraper, *metrics.Store) {
 	scrapers := make(map[string]*metrics.Scraper)
 	listers := make(map[string]metrics.BrokerLister)
 	for _, cc := range cfg.Clusters {
@@ -159,7 +159,7 @@ func initMetrics(cfg *config.Config, registry *kafka.Registry, logger *slog.Logg
 	store := metrics.NewStore()
 	if len(scrapers) > 0 {
 		collector := metrics.NewCollector(store, scrapers, listers, logger)
-		go collector.Run(context.Background())
+		go collector.Run(ctx)
 		logger.Info("metrics collector started", "clusters", len(scrapers))
 	}
 	return scrapers, store
@@ -219,7 +219,9 @@ func main() {
 
 	oidcProviders, oidcProviderCfg := initOIDCProviders(cfg, logger)
 	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
-	metricsScrapers, metricsStore := initMetrics(cfg, registry, logger)
+	metricsCtx, metricsCancel := context.WithCancel(context.Background())
+	defer metricsCancel()
+	metricsScrapers, metricsStore := initMetrics(metricsCtx, cfg, registry, logger)
 
 	router := api.NewRouter(api.RouterDeps{
 		Registry:           registry,

@@ -51,6 +51,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Mechanism == "" {
 		req.Mechanism = "SCRAM-SHA-256"
 	}
+	if req.Mechanism != "SCRAM-SHA-256" && req.Mechanism != "SCRAM-SHA-512" {
+		writeError(w, http.StatusBadRequest, "mechanism must be SCRAM-SHA-256 or SCRAM-SHA-512")
+		return
+	}
 
 	if err := client.UpsertScramUser(r.Context(), req); err != nil {
 		writeInternalError(w, "creating user", err)

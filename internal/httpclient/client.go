@@ -60,7 +60,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", c.errorPrefix, err)
 	}
 	defer resp.Body.Close()
 
@@ -101,7 +101,7 @@ func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", c.errorPrefix, err)
 	}
 	defer resp.Body.Close()
 
