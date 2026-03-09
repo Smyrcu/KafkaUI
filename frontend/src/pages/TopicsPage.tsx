@@ -55,7 +55,7 @@ export function TopicsPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Topics" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (error) return <><PageHeader title="Topics" breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
 
   return (
     <div>

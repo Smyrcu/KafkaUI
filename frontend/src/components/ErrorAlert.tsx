@@ -14,7 +14,7 @@ function friendlyMessage(msg: string): string {
 export function ErrorAlert({ error, message, onRetry }: { error?: unknown; message?: string; onRetry?: () => void }) {
   const msg = message ?? (error != null ? getErrorMessage(error) : "Unknown error");
   return (
-    <Card className="border-destructive/50 bg-destructive/5 animate-scale-in">
+    <Card role="alert" className="border-destructive/50 bg-destructive/5 animate-scale-in">
       <CardContent className="flex items-center gap-3 pt-6">
         <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
         <div className="flex-1">

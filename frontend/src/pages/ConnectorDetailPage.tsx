@@ -17,13 +17,16 @@ import { Activity, PlugZap, Server, ListTodo } from "lucide-react";
 import { getConnectorStateBadgeVariant } from "@/lib/helpers";
 import { rowClassName } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/error-utils";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export function ConnectorDetailPage() {
   const { clusterName, connectorName } = useParams<{ clusterName: string; connectorName: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [configJson, setConfigJson] = useState("");
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const { data: connector, isLoading, error, refetch } = useQuery({
     queryKey: ["connector-detail", clusterName, connectorName],
@@ -70,7 +73,7 @@ export function ConnectorDetailPage() {
   ];
 
   if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (error) return <><PageHeader title={connectorName!} breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   if (!connector) return null;
 
   const isPaused = connector.state.toUpperCase() === "PAUSED";
@@ -84,9 +87,10 @@ export function ConnectorDetailPage() {
   function handleSaveConfig() {
     try {
       const parsedConfig = JSON.parse(configJson);
+      setConfigError(null);
       updateConfigMutation.mutate(parsedConfig);
     } catch {
-      alert("Invalid JSON configuration");
+      setConfigError("Invalid JSON configuration");
     }
   }
 
@@ -111,7 +115,7 @@ export function ConnectorDetailPage() {
                 {pauseMutation.isPending ? "Pausing..." : "Pause"}
               </Button>
             )}
-            <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+            <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </div>
@@ -183,9 +187,9 @@ export function ConnectorDetailPage() {
                     onChange={(e) => setConfigJson(e.target.value)}
                     className="font-mono text-sm min-h-[300px]"
                   />
-                  {updateConfigMutation.isError && (
+                  {(configError || updateConfigMutation.isError) && (
                     <p className="text-sm text-destructive">
-                      {getErrorMessage(updateConfigMutation.error)}
+                      {configError ?? getErrorMessage(updateConfigMutation.error)}
                     </p>
                   )}
                   <div className="flex justify-end gap-2">
@@ -220,6 +224,14 @@ export function ConnectorDetailPage() {
           </Table>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Connector"
+        description={`Are you sure you want to delete connector "${connectorName}"? This action cannot be undone.`}
+        onConfirm={() => deleteMutation.mutate()}
+        destructive
+      />
     </div>
   );
 }

@@ -187,7 +187,7 @@ export interface KsqlResponse {
   type: string;
   statementText?: string;
   warnings?: { message: string }[];
-  data: any;
+  data: unknown;
 }
 
 export interface ACLEntry {

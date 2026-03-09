@@ -46,7 +46,9 @@ export function useWebSocket(url: string | null) {
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.send(JSON.stringify({ action: 'stop' }));
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: 'stop' }));
+      }
       wsRef.current.close();
       wsRef.current = null;
     }

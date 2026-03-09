@@ -102,10 +102,9 @@ function ThroughputChart({ history, range_ }: { history: TimestampedMetrics[]; r
         <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
         <YAxis tickFormatter={formatChartBytes} tick={{ fontSize: 11 }} width={65} />
         <Tooltip
-          formatter={((value: number | undefined, name?: string) => [
+          formatter={(value: number) => [
             formatBytes(value ?? 0),
-            name === "bytesIn" ? "Bytes In" : "Bytes Out",
-          ]) as any}
+          ]}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
         <defs>
@@ -136,7 +135,7 @@ function MessagesChart({ history, range_ }: { history: TimestampedMetrics[]; ran
         <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
         <YAxis tickFormatter={(v) => formatRate(v)} tick={{ fontSize: 11 }} width={65} />
         <Tooltip
-          formatter={((value: number | undefined) => [formatRate(value ?? 0), "Messages In"]) as any}
+          formatter={(value: number) => [formatRate(value ?? 0), "Messages In"]}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
         <Line type="monotone" dataKey="messagesIn" stroke="#fbbf24" strokeWidth={2.5} dot={false} />
@@ -364,7 +363,7 @@ export function MetricsPage() {
     const result = parseTimeInput(inputValue);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset(null as any);
+      setSelectedPreset("");
       setPickerOpen(false);
     }
   }
@@ -374,7 +373,7 @@ export function MetricsPage() {
     const result = parseTimeInput(example);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset(null as any);
+      setSelectedPreset("");
       setPickerOpen(false);
     }
   }
@@ -416,7 +415,7 @@ export function MetricsPage() {
         </div>
       );
     }
-    return <ErrorAlert error={error} onRetry={() => refetch()} />;
+    return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   }
 
   const brokers = data?.brokers ?? [];
