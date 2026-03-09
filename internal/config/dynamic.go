@@ -17,7 +17,7 @@ type dynamicFile struct {
 // DynamicConfig manages dynamic cluster configurations persisted in a YAML file.
 type DynamicConfig struct {
 	path string
-	mu   sync.Mutex
+	mu   sync.RWMutex
 }
 
 // NewDynamicConfig creates a DynamicConfig that reads/writes the given file path.
@@ -27,8 +27,8 @@ func NewDynamicConfig(path string) *DynamicConfig {
 
 // Load reads the dynamic clusters file. Returns nil, nil if the file does not exist.
 func (dc *DynamicConfig) Load() ([]ClusterConfig, error) {
-	dc.mu.Lock()
-	defer dc.mu.Unlock()
+	dc.mu.RLock()
+	defer dc.mu.RUnlock()
 
 	return dc.loadLocked()
 }

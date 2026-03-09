@@ -22,6 +22,7 @@ Thumbs.db
 
 # Config with secrets
 config.yaml
+config.yaml.bak.*
 config.test-*.yaml
 !config.example.yaml
 

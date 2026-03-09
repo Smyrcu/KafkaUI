@@ -23,6 +23,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      automountServiceAccountToken: false
       serviceAccountName: {{ include "kafkaui.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -91,7 +92,8 @@ spec:
           persistentVolumeClaim:
             claimName: {{ include "kafkaui.fullname" . }}
           {{- else }}
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: 10Mi
           {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

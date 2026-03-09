@@ -18,7 +18,9 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	// CheckOrigin allows all origins; the API already uses CORS middleware.
+	// In production, restrict this to match your AllowedOrigins configuration.
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 type controlMessage struct {
@@ -143,7 +145,11 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				data, _ := json.Marshal(msg)
+				data, err := json.Marshal(msg)
+				if err != nil {
+					h.logger.Error("failed to marshal live tail message", "error", err)
+					return
+				}
 				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 					cancel()
 				}
