@@ -41,6 +41,9 @@ dev/kafka-config/
 *.key
 *.crt
 
+# Code review reports
+code-review-*.md
+
 # Logs
 *.log
 
