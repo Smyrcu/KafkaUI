@@ -10,7 +10,12 @@ SR_URL="http://localhost:8081"
 CONNECT_URL="http://localhost:8083"
 
 echo "⏳ Waiting for Kafka..."
-until $KAFKA $KAFKA_BIN/kafka-broker-api-versions.sh --bootstrap-server $BOOTSTRAP &>/dev/null; do sleep 1; done
+retries=0
+until $KAFKA $KAFKA_BIN/kafka-broker-api-versions.sh --bootstrap-server $BOOTSTRAP &>/dev/null; do
+  retries=$((retries + 1))
+  if [ "$retries" -ge 60 ]; then echo "❌ Kafka not ready after 60s"; exit 1; fi
+  sleep 1
+done
 echo "✅ Kafka ready"
 
 # ── Topics ──────────────────────────────────────────────
@@ -74,7 +79,12 @@ $KAFKA $KAFKA_BIN/kafka-acls.sh --bootstrap-server $BOOTSTRAP \
 
 # ── Schema Registry ─────────────────────────────────────
 echo "⏳ Waiting for Schema Registry..."
-until curl -sf "$SR_URL/subjects" &>/dev/null; do sleep 1; done
+retries=0
+until curl -sf "$SR_URL/subjects" &>/dev/null; do
+  retries=$((retries + 1))
+  if [ "$retries" -ge 60 ]; then echo "❌ Schema Registry not ready after 60s"; exit 1; fi
+  sleep 1
+done
 echo "✅ Schema Registry ready"
 
 echo "📋 Registering schemas..."
@@ -101,7 +111,12 @@ curl -sf -X POST "$SR_URL/subjects/payments-value/versions" \
 
 # ── Kafka Connect ───────────────────────────────────────
 echo "⏳ Waiting for Kafka Connect..."
-until curl -sf "$CONNECT_URL/" &>/dev/null; do sleep 2; done
+retries=0
+until curl -sf "$CONNECT_URL/" &>/dev/null; do
+  retries=$((retries + 1))
+  if [ "$retries" -ge 60 ]; then echo "❌ Kafka Connect not ready after 120s"; exit 1; fi
+  sleep 2
+done
 echo "✅ Kafka Connect ready"
 
 echo "🔌 Creating connectors..."

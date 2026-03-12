@@ -86,6 +86,10 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "mechanism is required")
 		return
 	}
+	if req.Mechanism != "SCRAM-SHA-256" && req.Mechanism != "SCRAM-SHA-512" {
+		writeError(w, http.StatusBadRequest, "mechanism must be SCRAM-SHA-256 or SCRAM-SHA-512")
+		return
+	}
 
 	if err := client.DeleteScramUser(r.Context(), req.Name, req.Mechanism); err != nil {
 		writeInternalError(w, "deleting user", err)

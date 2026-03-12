@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -142,6 +143,7 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		key := fmt.Sprintf("%s:%d", clusterName, broker.ID)
 
 		if latest[i].err != nil {
+			slog.Error("metrics scrape failed", "cluster", clusterName, "broker", broker.ID, "error", latest[i].err)
 			results[i] = BrokerMetricsResponse{
 				ID:      broker.ID,
 				Host:    display,

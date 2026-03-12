@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const maxResponseBody = 16 << 20 // 16 MB
+
 // Client is a reusable HTTP client for JSON-based APIs. It handles request
 // encoding, response decoding, and error formatting with configurable
 // content types and error prefixes.
@@ -64,7 +66,6 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, dest any
 	}
 	defer resp.Body.Close()
 
-	const maxResponseBody = 16 << 20 // 16 MB
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return fmt.Errorf("read response body: %w", err)
@@ -105,7 +106,6 @@ func (c *Client) DoRaw(ctx context.Context, method, path string, body io.Reader)
 	}
 	defer resp.Body.Close()
 
-	const maxResponseBody = 16 << 20 // 16 MB
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)

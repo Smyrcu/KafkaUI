@@ -26,8 +26,8 @@ config.yaml.bak.*
 config.test-*.yaml
 !config.example.yaml
 
-# Design plans (may contain internal notes)
-docs/plans/
+# Internal docs (plans, notes, review artifacts)
+docs/
 
 # Dev environment artifacts
 dev/jmx-exporter/*.jar
