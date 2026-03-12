@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,9 +19,18 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// CheckOrigin allows all origins; the API already uses CORS middleware.
-	// In production, restrict this to match your AllowedOrigins configuration.
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		host := r.Host
+		if host == "" {
+			host = r.Header.Get("Host")
+		}
+		// Allow same-origin requests: origin must end with the host
+		return strings.HasSuffix(origin, "://"+host)
+	},
 }
 
 type controlMessage struct {

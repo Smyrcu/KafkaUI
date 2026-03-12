@@ -70,6 +70,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			r.Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
+				r.Use(middleware.RequireRole("admin", deps.AuthEnabled))
 				r.Get("/clusters", adminHandler.ListClusters)
 				r.Post("/clusters", adminHandler.AddCluster)
 				r.Post("/clusters/test", adminHandler.TestConnection)

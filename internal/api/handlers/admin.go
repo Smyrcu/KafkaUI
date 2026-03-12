@@ -112,7 +112,7 @@ func (h *AdminHandler) AddCluster(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("validate") != "false" {
 		if err := testConnection(cc); err != nil {
-			writeError(w, http.StatusBadGateway, "connection test failed: "+err.Error())
+			writeError(w, http.StatusBadGateway, "connection test failed: unable to reach broker")
 			return
 		}
 	}
@@ -154,7 +154,7 @@ func (h *AdminHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("validate") != "false" {
 		if err := testConnection(cc); err != nil {
-			writeError(w, http.StatusBadGateway, "connection test failed: "+err.Error())
+			writeError(w, http.StatusBadGateway, "connection test failed: unable to reach broker")
 			return
 		}
 	}
