@@ -29,7 +29,7 @@ export function DashboardPage() {
   });
 
   if (isLoading) return <DashboardSkeleton />;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (error) return <><PageHeader title="Dashboard" description="Overview of your Kafka clusters" /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
 
   const clusters = overview ?? [];
 

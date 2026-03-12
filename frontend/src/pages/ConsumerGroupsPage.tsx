@@ -32,7 +32,7 @@ export function ConsumerGroupsPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Consumer Groups" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (error) return <><PageHeader title="Consumer Groups" breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
 
   return (
     <div>

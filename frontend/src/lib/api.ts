@@ -316,7 +316,7 @@ export const api = {
   },
   ksql: {
     execute: (cluster: string, data: KsqlRequest) => request<KsqlResponse>(`/clusters/${cluster}/ksql`, { method: 'POST', body: JSON.stringify(data) }),
-    info: (cluster: string) => request<Record<string, any>>(`/clusters/${cluster}/ksql/info`),
+    info: (cluster: string) => request<Record<string, unknown>>(`/clusters/${cluster}/ksql/info`),
   },
   acl: {
     list: (cluster: string) => request<ACLEntry[]>(`/clusters/${cluster}/acls`),

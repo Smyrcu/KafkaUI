@@ -39,8 +39,8 @@ export function SchemaDetailPage() {
     { label: subject! },
   ];
 
-  if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (isLoading) return <><PageHeader title={subject!} breadcrumbs={breadcrumbs} /><DetailSkeleton /></>;
+  if (error) return <><PageHeader title={subject!} breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   if (!schema) return null;
 
   const sortedVersions = [...schema.versions].sort((a, b) => b.version - a.version);

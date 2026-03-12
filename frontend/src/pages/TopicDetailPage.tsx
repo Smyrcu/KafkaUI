@@ -25,8 +25,8 @@ export function TopicDetailPage() {
     { label: topicName! },
   ];
 
-  if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (isLoading) return <><PageHeader title={topicName!} breadcrumbs={breadcrumbs} /><DetailSkeleton /></>;
+  if (error) return <><PageHeader title={topicName!} breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   if (!topic) return null;
 
   return (

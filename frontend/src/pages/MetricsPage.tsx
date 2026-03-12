@@ -383,7 +383,7 @@ export function MetricsPage() {
     const from = new Date(calFrom).toISOString();
     const to = calTo ? new Date(calTo).toISOString() : new Date().toISOString();
     setCustomRange({ from, to });
-    setSelectedPreset(null as any);
+    setSelectedPreset("");
     setPickerOpen(false);
   }
 
@@ -393,7 +393,7 @@ export function MetricsPage() {
       ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
       : activePreset?.label ?? "Past 1 Hour";
 
-  if (isLoading) return <TableSkeleton rows={3} cols={4} />;
+  if (isLoading) return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><TableSkeleton rows={3} cols={4} /></>;
 
   if (error) {
     const msg = getErrorMessage(error);

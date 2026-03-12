@@ -47,8 +47,8 @@ export function ConsumerGroupDetailPage() {
     { label: groupName! },
   ];
 
-  if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert error={error} onRetry={() => refetch()} />;
+  if (isLoading) return <><PageHeader title={groupName!} breadcrumbs={breadcrumbs} /><DetailSkeleton /></>;
+  if (error) return <><PageHeader title={groupName!} breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   if (!group) return null;
 
   const availableTopics = group.offsets.map(o => o.topic);
