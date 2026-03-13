@@ -13,108 +13,95 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-type BrokerMetrics struct {
-	BytesInPerSec             float64 `json:"bytesInPerSec"`
-	BytesOutPerSec            float64 `json:"bytesOutPerSec"`
-	MessagesInPerSec          float64 `json:"messagesInPerSec"`
-	UnderReplicatedPartitions float64 `json:"underReplicatedPartitions"`
-	ActiveControllerCount     float64 `json:"activeControllerCount"`
-	OfflinePartitionsCount    float64 `json:"offlinePartitionsCount"`
+// Sample is a single data point with optional labels.
+type Sample struct {
+	Labels map[string]string `json:"labels,omitempty"`
+	Value  float64           `json:"value"`
 }
 
+// MetricFamily is one Prometheus metric with its metadata and all samples.
+type MetricFamily struct {
+	Name    string   `json:"name"`
+	Help    string   `json:"help"`
+	Type    string   `json:"type"`
+	Samples []Sample `json:"samples"`
+}
+
+// Snapshot is the full result of a single scrape — metric name → MetricFamily.
+type Snapshot map[string]MetricFamily
+
+// Scraper fetches and parses Prometheus metrics from a URL.
 type Scraper struct {
-	urlPattern string
-	client     *http.Client
+	url    string
+	client *http.Client
 }
 
-func NewScraper(urlPattern string) *Scraper {
+// NewScraper creates a scraper for the given URL (used as-is from config).
+func NewScraper(url string) *Scraper {
 	return &Scraper{
-		urlPattern: urlPattern,
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		url:    url,
+		client: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-func (s *Scraper) buildURL(host string) string {
-	return strings.ReplaceAll(s.urlPattern, "{host}", host)
-}
-
-func (s *Scraper) Scrape(ctx context.Context, host string) (BrokerMetrics, error) {
-	url := s.buildURL(host)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+// Scrape fetches and parses all metrics from the configured URL.
+func (s *Scraper) Scrape(ctx context.Context) (Snapshot, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
 	if err != nil {
-		return BrokerMetrics{}, fmt.Errorf("creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return BrokerMetrics{}, fmt.Errorf("fetching metrics from %s: %w", url, err)
+		return nil, fmt.Errorf("fetching metrics from %s: %w", s.url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return BrokerMetrics{}, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, url)
+		return nil, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, s.url)
 	}
 
-	return parseMetrics(resp.Body)
+	return parseAllMetrics(resp.Body)
 }
 
-var metricKeys = map[string]func(*BrokerMetrics, float64){
-	"kafka_server_brokertopicmetrics_bytesinpersec":           func(m *BrokerMetrics, v float64) { m.BytesInPerSec = v },
-	"kafka_server_brokertopicmetrics_bytesoutpersec":          func(m *BrokerMetrics, v float64) { m.BytesOutPerSec = v },
-	"kafka_server_brokertopicmetrics_messagesinpersec":        func(m *BrokerMetrics, v float64) { m.MessagesInPerSec = v },
-	"kafka_server_replicamanager_underreplicatedpartitions":   func(m *BrokerMetrics, v float64) { m.UnderReplicatedPartitions = v },
-	"kafka_controller_kafkacontroller_activecontrollercount":  func(m *BrokerMetrics, v float64) { m.ActiveControllerCount = v },
-	"kafka_controller_kafkacontroller_offlinepartitionscount": func(m *BrokerMetrics, v float64) { m.OfflinePartitionsCount = v },
-}
-
-func parseMetrics(r io.Reader) (BrokerMetrics, error) {
+func parseAllMetrics(r io.Reader) (Snapshot, error) {
 	parser := expfmt.NewTextParser(model.LegacyValidation)
 	families, err := parser.TextToMetricFamilies(r)
 	if err != nil {
-		return BrokerMetrics{}, fmt.Errorf("parsing prometheus metrics: %w", err)
+		return nil, fmt.Errorf("parsing prometheus metrics: %w", err)
 	}
 
-	var m BrokerMetrics
-	for name, setter := range metricKeys {
-		if fam, ok := families[name]; ok {
-			v := extractValue(fam)
-			setter(&m, v)
+	snap := make(Snapshot, len(families))
+	for name, fam := range families {
+		mf := MetricFamily{
+			Name: name,
+			Help: fam.GetHelp(),
+			Type: strings.ToLower(fam.GetType().String()),
 		}
+		for _, m := range fam.GetMetric() {
+			s := Sample{Value: extractSampleValue(m)}
+			if len(m.GetLabel()) > 0 {
+				s.Labels = make(map[string]string, len(m.GetLabel()))
+				for _, l := range m.GetLabel() {
+					s.Labels[l.GetName()] = l.GetValue()
+				}
+			}
+			mf.Samples = append(mf.Samples, s)
+		}
+		snap[name] = mf
 	}
-	return m, nil
+	return snap, nil
 }
 
-func extractValue(fam *dto.MetricFamily) float64 {
-	for _, metric := range fam.GetMetric() {
-		if hasEmptyTopicLabel(metric) || len(metric.GetLabel()) == 0 {
-			if g := metric.GetGauge(); g != nil {
-				return g.GetValue()
-			}
-			if u := metric.GetUntyped(); u != nil {
-				return u.GetValue()
-			}
-		}
+func extractSampleValue(m *dto.Metric) float64 {
+	if g := m.GetGauge(); g != nil {
+		return g.GetValue()
 	}
-	if len(fam.GetMetric()) > 0 {
-		m := fam.GetMetric()[0]
-		if g := m.GetGauge(); g != nil {
-			return g.GetValue()
-		}
-		if u := m.GetUntyped(); u != nil {
-			return u.GetValue()
-		}
+	if c := m.GetCounter(); c != nil {
+		return c.GetValue()
+	}
+	if u := m.GetUntyped(); u != nil {
+		return u.GetValue()
 	}
 	return 0
-}
-
-func hasEmptyTopicLabel(m *dto.Metric) bool {
-	for _, l := range m.GetLabel() {
-		if l.GetName() == "topic" && l.GetValue() == "" {
-			return true
-		}
-	}
-	return false
 }

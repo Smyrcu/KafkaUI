@@ -5,49 +5,70 @@ import (
 	"time"
 )
 
-// TimestampedMetrics is a single data point with a timestamp.
-type TimestampedMetrics struct {
-	Time    time.Time    `json:"time"`
-	Metrics BrokerMetrics `json:"metrics"`
+const maxAge = 24 * time.Hour
+
+// MetricPoint is a single value at a point in time.
+type MetricPoint struct {
+	Time  time.Time `json:"time"`
+	Value float64   `json:"value"`
 }
 
-// Store holds in-memory time-series metrics per broker, keyed by "cluster:brokerID".
-// Retains up to 14 days of data at 30s intervals (~40320 points per broker).
+// Store holds per-cluster, per-metric time-series data and the latest snapshot.
 type Store struct {
-	mu   sync.RWMutex
-	data map[string][]TimestampedMetrics
+	mu     sync.RWMutex
+	series map[string]map[string][]MetricPoint // cluster → metricName → points
+	latest map[string]Snapshot                  // cluster → last scrape
 }
 
-const maxAge = 14 * 24 * time.Hour
-
+// NewStore creates an empty metrics store.
 func NewStore() *Store {
 	return &Store{
-		data: make(map[string][]TimestampedMetrics),
+		series: make(map[string]map[string][]MetricPoint),
+		latest: make(map[string]Snapshot),
 	}
 }
 
-// Append adds a data point for a broker key.
-func (s *Store) Append(key string, m BrokerMetrics) {
+// Append records a new snapshot: updates latest and appends time-series points.
+func (s *Store) Append(cluster string, snap Snapshot) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	now := time.Now()
-	s.data[key] = append(s.data[key], TimestampedMetrics{Time: now, Metrics: m})
-	s.evict(key)
+	s.latest[cluster] = snap
+
+	if s.series[cluster] == nil {
+		s.series[cluster] = make(map[string][]MetricPoint)
+	}
+	for name, fam := range snap {
+		if len(fam.Samples) > 0 {
+			s.series[cluster][name] = append(s.series[cluster][name], MetricPoint{
+				Time:  now,
+				Value: fam.Samples[0].Value,
+			})
+		}
+	}
+	s.evict(cluster)
 }
 
-// Query returns data points for a broker key within the given duration from now.
-func (s *Store) Query(key string, duration time.Duration) []TimestampedMetrics {
+// GetLatest returns the most recent snapshot for a cluster.
+func (s *Store) GetLatest(cluster string) (Snapshot, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	snap, ok := s.latest[cluster]
+	return snap, ok
+}
+
+// QueryMetric returns time-series points for a specific metric within the given duration.
+func (s *Store) QueryMetric(cluster, metricName string, duration time.Duration) []MetricPoint {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	points := s.data[key]
+	points := s.series[cluster][metricName]
 	if len(points) == 0 {
 		return nil
 	}
 
 	cutoff := time.Now().Add(-duration)
-	// Binary search for cutoff
 	lo, hi := 0, len(points)
 	for lo < hi {
 		mid := (lo + hi) / 2
@@ -62,19 +83,28 @@ func (s *Store) Query(key string, duration time.Duration) []TimestampedMetrics {
 	if len(result) == 0 {
 		return nil
 	}
-	out := make([]TimestampedMetrics, len(result))
+	out := make([]MetricPoint, len(result))
 	copy(out, result)
 	return out
 }
 
-func (s *Store) evict(key string) {
-	points := s.data[key]
+// HasData returns true if the store has any data for the given cluster.
+func (s *Store) HasData(cluster string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.latest[cluster]
+	return ok
+}
+
+func (s *Store) evict(cluster string) {
 	cutoff := time.Now().Add(-maxAge)
-	lo := 0
-	for lo < len(points) && points[lo].Time.Before(cutoff) {
-		lo++
-	}
-	if lo > 0 {
-		s.data[key] = points[lo:]
+	for name, points := range s.series[cluster] {
+		lo := 0
+		for lo < len(points) && points[lo].Time.Before(cutoff) {
+			lo++
+		}
+		if lo > 0 {
+			s.series[cluster][name] = points[lo:]
+		}
 	}
 }
