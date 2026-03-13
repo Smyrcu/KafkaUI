@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestACLHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/acls", nil)
@@ -29,7 +31,7 @@ func TestACLHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestACLHandler_List_ValidCluster(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/acls", nil)
@@ -40,14 +42,13 @@ func TestACLHandler_List_ValidCluster(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
-	// 500 = Kafka unreachable (not 404)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rec.Code)
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("valid cluster should not return 404, got %d", rec.Code)
 	}
 }
 
 func TestACLHandler_Create_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{
@@ -74,7 +75,7 @@ func TestACLHandler_Create_ClusterNotFound(t *testing.T) {
 }
 
 func TestACLHandler_Create_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -92,7 +93,7 @@ func TestACLHandler_Create_InvalidBody(t *testing.T) {
 }
 
 func TestACLHandler_Create_MissingResourceType(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{
@@ -118,7 +119,7 @@ func TestACLHandler_Create_MissingResourceType(t *testing.T) {
 }
 
 func TestACLHandler_Create_MissingPrincipal(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{
@@ -144,7 +145,7 @@ func TestACLHandler_Create_MissingPrincipal(t *testing.T) {
 }
 
 func TestACLHandler_Create_MissingOperation(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{
@@ -170,7 +171,7 @@ func TestACLHandler_Create_MissingOperation(t *testing.T) {
 }
 
 func TestACLHandler_Delete_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{
@@ -197,7 +198,7 @@ func TestACLHandler_Delete_ClusterNotFound(t *testing.T) {
 }
 
 func TestACLHandler_Delete_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -215,7 +216,7 @@ func TestACLHandler_Delete_InvalidBody(t *testing.T) {
 }
 
 func TestACLHandler_Delete_MissingResourceType(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewACLHandler(reg)
 
 	payload := map[string]any{

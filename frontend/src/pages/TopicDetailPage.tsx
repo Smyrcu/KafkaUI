@@ -8,6 +8,7 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { TopicTabs } from "@/components/TopicTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { DetailSkeleton } from "@/components/PageSkeleton";
+import { rowClassName } from "@/lib/utils";
 
 export function TopicDetailPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
@@ -24,8 +25,8 @@ export function TopicDetailPage() {
     { label: topicName! },
   ];
 
-  if (isLoading) return <DetailSkeleton />;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (isLoading) return <><PageHeader title={topicName!} breadcrumbs={breadcrumbs} /><DetailSkeleton /></>;
+  if (error) return <><PageHeader title={topicName!} breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   if (!topic) return null;
 
   return (
@@ -48,7 +49,7 @@ export function TopicDetailPage() {
               </TableHeader>
               <TableBody>
                 {topic.partitions.map((p) => (
-                  <TableRow key={p.id} className={p.id % 2 === 1 ? "bg-muted/30" : ""}>
+                  <TableRow key={p.id} className={rowClassName(p.id)}>
                     <TableCell><Badge variant="outline">{p.id}</Badge></TableCell>
                     <TableCell>{p.leader}</TableCell>
                     <TableCell>{p.replicas.join(", ")}</TableCell>
@@ -66,7 +67,7 @@ export function TopicDetailPage() {
               <TableHeader><TableRow><TableHead>Key</TableHead><TableHead>Value</TableHead></TableRow></TableHeader>
               <TableBody>
                 {Object.entries(topic.configs).map(([key, value], i) => (
-                  <TableRow key={key} className={i % 2 === 1 ? "bg-muted/30" : ""}>
+                  <TableRow key={key} className={rowClassName(i)}>
                     <TableCell className="font-mono text-xs">{key}</TableCell>
                     <TableCell className="font-mono text-xs">{value}</TableCell>
                   </TableRow>

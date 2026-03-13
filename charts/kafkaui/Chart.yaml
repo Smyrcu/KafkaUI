@@ -4,3 +4,8 @@ description: A Helm chart for KafkaUI - web UI for Apache Kafka
 type: application
 version: 0.11.0
 appVersion: "0.11.0"
+home: https://github.com/Smyrcu/KafkaUI
+sources:
+  - https://github.com/Smyrcu/KafkaUI
+maintainers:
+  - name: Smyrcu

@@ -9,12 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
 import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter, Download } from "lucide-react";
+import { rowClassName } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/error-utils";
 
 type OffsetMode = "latest" | "earliest" | "timestamp" | "custom";
 
@@ -106,7 +110,7 @@ export function TopicMessagesPage() {
     a.href = url;
     a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
   const rowKey = (m: MessageRecord) => `${m.partition}-${m.offset}`;
 
@@ -135,17 +139,17 @@ export function TopicMessagesPage() {
         </div>
         <div className="grid gap-1">
           <Label className="text-xs">Offset</Label>
-          <select
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            value={offsetMode}
-            onChange={(e) => setOffsetMode(e.target.value as OffsetMode)}
-            disabled={isLiveTail}
-          >
-            <option value="earliest">Earliest</option>
-            <option value="latest">Latest</option>
-            <option value="timestamp">Timestamp</option>
-            <option value="custom">Custom</option>
-          </select>
+          <Select value={offsetMode} onValueChange={(v) => setOffsetMode(v as OffsetMode)} disabled={isLiveTail}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="earliest">Earliest</SelectItem>
+              <SelectItem value="latest">Latest</SelectItem>
+              <SelectItem value="timestamp">Timestamp</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {offsetMode === "custom" && (
           <div className="grid gap-1">
@@ -191,8 +195,8 @@ export function TopicMessagesPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label>Value</Label>
-                  <textarea
-                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-mono"
+                  <Textarea
+                    className="min-h-[120px] font-mono"
                     value={produceData.value}
                     onChange={(e) => setProduceData({ ...produceData, value: e.target.value })}
                     placeholder='{"event": "test"}'
@@ -221,7 +225,7 @@ export function TopicMessagesPage() {
                   {produceMutation.isPending ? "Sending..." : "Send"}
                 </Button>
               </DialogFooter>
-              {produceMutation.isError && <p className="text-sm text-destructive">{(produceMutation.error as Error).message}</p>}
+              {produceMutation.isError && <p className="text-sm text-destructive">{getErrorMessage(produceMutation.error)}</p>}
             </DialogContent>
           </Dialog>
         </div>
@@ -258,7 +262,7 @@ export function TopicMessagesPage() {
         </div>
       )}
 
-      {error && <ErrorAlert message={(error as Error).message} />}
+      {error && <ErrorAlert error={error} />}
 
       {/* Message table */}
       {isLoading ? (
@@ -285,7 +289,7 @@ export function TopicMessagesPage() {
                 const isExpanded = expandedRow === key;
                 return (
                   <Fragment key={key}>
-                    <TableRow className={`cursor-pointer hover:bg-muted/50 ${i % 2 === 1 ? "bg-muted/30" : ""}`} onClick={() => setExpandedRow(isExpanded ? null : key)}>
+                    <TableRow className={`cursor-pointer hover:bg-muted/50 ${rowClassName(i)}`} onClick={() => setExpandedRow(isExpanded ? null : key)}>
                       <TableCell>{isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                       <TableCell><Badge variant="outline">{m.partition}</Badge></TableCell>
                       <TableCell className="font-mono text-xs">{m.offset}</TableCell>

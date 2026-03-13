@@ -3,8 +3,6 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
 
@@ -17,16 +15,14 @@ func NewBrokerHandler(reg *kafka.Registry) *BrokerHandler {
 }
 
 func (h *BrokerHandler) List(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	brokers, err := client.Brokers(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "listing brokers", err)
 		return
 	}
 

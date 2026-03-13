@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestTopicHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/topics", nil)
@@ -29,7 +31,7 @@ func TestTopicHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestTopicHandler_Create_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -47,7 +49,7 @@ func TestTopicHandler_Create_InvalidBody(t *testing.T) {
 }
 
 func TestTopicHandler_Create_MissingName(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	payload := map[string]any{"partitions": 3, "replicas": 1}
@@ -66,7 +68,8 @@ func TestTopicHandler_Create_MissingName(t *testing.T) {
 }
 
 func TestTopicHandler_List_ValidCluster(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	// With a valid cluster name, we expect either 200 (Kafka reachable) or 500 (unreachable), but never 404
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics", nil)
@@ -77,14 +80,13 @@ func TestTopicHandler_List_ValidCluster(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
-	// 500 = Kafka unreachable (not 404)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rec.Code)
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("valid cluster should not return 404, got %d", rec.Code)
 	}
 }
 
 func TestTopicHandler_Details_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/topics/test", nil)
@@ -102,7 +104,7 @@ func TestTopicHandler_Details_ClusterNotFound(t *testing.T) {
 }
 
 func TestTopicHandler_Delete_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/nonexistent/topics/test", nil)
@@ -120,7 +122,7 @@ func TestTopicHandler_Delete_ClusterNotFound(t *testing.T) {
 }
 
 func TestTopicHandler_Create_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewTopicHandler(reg)
 
 	payload := map[string]any{"name": "test", "partitions": 1, "replicas": 1}

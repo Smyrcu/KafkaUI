@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,48 +10,40 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/api/handlers"
 	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/api/ws"
-	"github.com/Smyrcu/KafkaUI/internal/auth"
-	"github.com/Smyrcu/KafkaUI/internal/config"
-	"github.com/Smyrcu/KafkaUI/internal/kafka"
-	"github.com/Smyrcu/KafkaUI/internal/masking"
-	"github.com/Smyrcu/KafkaUI/internal/metrics"
 )
 
-func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.SessionManager, authEnabled bool, maskingEngine *masking.Engine, oidcProviders map[string]*auth.Provider, oidcProviderCfg []config.OIDCProvider, basicAuth *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, authTypes []string, metricsScrapers map[string]*metrics.Scraper, metricsStore *metrics.Store, dynamicCfg *config.DynamicConfig, staticClusterNames []string) http.Handler {
+func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
-	r.Use(middleware.Logger(logger))
+	r.Use(middleware.Logger(deps.Logger))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		MaxAge:           300,
 	}))
+	r.Use(middleware.MaxBodySize(5 << 20))
 
-	clusterHandler := handlers.NewClusterHandler(registry)
-	brokerHandler := handlers.NewBrokerHandler(registry)
-	topicHandler := handlers.NewTopicHandler(registry)
-	messageHandler := handlers.NewMessageHandler(registry, maskingEngine)
-	consumerGroupHandler := handlers.NewConsumerGroupHandler(registry)
-	schemaHandler := handlers.NewSchemaHandler(registry)
-	connectHandler := handlers.NewConnectHandler(registry)
-	ksqlHandler := handlers.NewKsqlHandler(registry)
-	aclHandler := handlers.NewACLHandler(registry)
-	userHandler := handlers.NewUserHandler(registry)
-	dashboardHandler := handlers.NewDashboardHandler(registry)
-	metricsHandler := handlers.NewMetricsHandler(registry, metricsScrapers, metricsStore)
-	liveTailHandler := ws.NewLiveTailHandler(registry, logger)
+	clusterHandler := handlers.NewClusterHandler(deps.Registry)
+	brokerHandler := handlers.NewBrokerHandler(deps.Registry)
+	topicHandler := handlers.NewTopicHandler(deps.Registry)
+	messageHandler := handlers.NewMessageHandler(deps.Registry, deps.MaskingEngine)
+	consumerGroupHandler := handlers.NewConsumerGroupHandler(deps.Registry)
+	schemaHandler := handlers.NewSchemaHandler(deps.Registry)
+	connectHandler := handlers.NewConnectHandler(deps.Registry)
+	ksqlHandler := handlers.NewKsqlHandler(deps.Registry)
+	aclHandler := handlers.NewACLHandler(deps.Registry)
+	userHandler := handlers.NewUserHandler(deps.Registry)
+	dashboardHandler := handlers.NewDashboardHandler(deps.Registry)
+	metricsHandler := handlers.NewMetricsHandler(deps.Registry, deps.MetricsScrapers, deps.MetricsStore)
+	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger)
 
-	adminHandler := handlers.NewAdminHandler(registry, dynamicCfg, staticClusterNames)
-	healthHandler := handlers.NewHealthHandler(registry)
+	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
+	healthHandler := handlers.NewHealthHandler(deps.Registry)
 
-	authHandler := handlers.NewAuthHandler(oidcProviders, oidcProviderCfg, basicAuth, rateLimiter, sessions, logger, authEnabled, authTypes)
-
-	// Dev mock metrics endpoint
-	mockMetrics := metrics.NewMockHandler()
-	r.Get("/debug/mock-metrics", mockMetrics.ServeHTTP)
+	authHandler := handlers.NewAuthHandler(deps.OIDCProviders, deps.OIDCProviderCfg, deps.BasicAuth, deps.RateLimiter, deps.Sessions, deps.Logger, deps.AuthEnabled, deps.AuthTypes)
 
 	// Health probes — top-level, no auth
 	r.Get("/healthz", healthHandler.Liveness)
@@ -73,12 +64,13 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 
 		// Protected API routes
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.Auth(sessions, authEnabled))
+			r.Use(middleware.Auth(deps.Sessions, deps.AuthEnabled))
 
 			r.Get("/dashboard", dashboardHandler.Overview)
 			r.Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
+				r.Use(middleware.RequireRole("admin", deps.AuthEnabled))
 				r.Get("/clusters", adminHandler.ListClusters)
 				r.Post("/clusters", adminHandler.AddCluster)
 				r.Post("/clusters/test", adminHandler.TestConnection)
@@ -133,7 +125,7 @@ func NewRouter(registry *kafka.Registry, logger *slog.Logger, sessions *auth.Ses
 	})
 
 	r.Route("/ws", func(r chi.Router) {
-		r.Use(middleware.Auth(sessions, authEnabled))
+		r.Use(middleware.Auth(deps.Sessions, deps.AuthEnabled))
 		r.Get("/clusters/{clusterName}/topics/{topicName}/live", liveTailHandler.Handle)
 	})
 

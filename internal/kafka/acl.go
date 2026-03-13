@@ -40,11 +40,7 @@ func (c *Client) ListACLs(ctx context.Context) ([]ACLEntry, error) {
 	}
 
 	if aclResp.ErrorCode != 0 {
-		msg := ""
-		if aclResp.ErrorMessage != nil {
-			msg = *aclResp.ErrorMessage
-		}
-		return nil, fmt.Errorf("DescribeACLs failed with error code %d: %s", aclResp.ErrorCode, msg)
+		return nil, fmt.Errorf("DescribeACLs failed with %s", kafkaErrMsg(aclResp.ErrorCode, aclResp.ErrorMessage))
 	}
 
 	var entries []ACLEntry
@@ -94,11 +90,7 @@ func (c *Client) CreateACL(ctx context.Context, entry ACLEntry) error {
 
 	for _, result := range createResp.Results {
 		if result.ErrorCode != 0 {
-			msg := ""
-			if result.ErrorMessage != nil {
-				msg = *result.ErrorMessage
-			}
-			return fmt.Errorf("CreateACL failed with error code %d: %s", result.ErrorCode, msg)
+			return fmt.Errorf("CreateACL failed with %s", kafkaErrMsg(result.ErrorCode, result.ErrorMessage))
 		}
 	}
 
@@ -130,11 +122,7 @@ func (c *Client) DeleteACL(ctx context.Context, entry ACLEntry) error {
 
 	for _, result := range deleteResp.Results {
 		if result.ErrorCode != 0 {
-			msg := ""
-			if result.ErrorMessage != nil {
-				msg = *result.ErrorMessage
-			}
-			return fmt.Errorf("DeleteACL failed with error code %d: %s", result.ErrorCode, msg)
+			return fmt.Errorf("DeleteACL failed with %s", kafkaErrMsg(result.ErrorCode, result.ErrorMessage))
 		}
 	}
 

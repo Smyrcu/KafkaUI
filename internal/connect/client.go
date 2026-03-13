@@ -2,19 +2,17 @@ package connect
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/Smyrcu/KafkaUI/internal/httpclient"
 )
 
 type Client struct {
-	baseURL    string
-	name       string
-	httpClient *http.Client
+	name string
+	http *httpclient.Client
 }
 
 type ConnectorInfo struct {
@@ -49,9 +47,14 @@ type CreateConnectorRequest struct {
 
 func NewClient(name, baseURL string) *Client {
 	return &Client{
-		name:       name,
-		baseURL:    strings.TrimRight(baseURL, "/"),
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		name: name,
+		http: httpclient.New(
+			strings.TrimRight(baseURL, "/"),
+			10*time.Second,
+			"application/json",
+			"application/json",
+			"kafka connect error",
+		),
 	}
 }
 
@@ -72,7 +75,7 @@ func (c *Client) ListConnectors(ctx context.Context) ([]ConnectorInfo, error) {
 		} `json:"status"`
 	}
 
-	if err := c.doJSON(ctx, http.MethodGet, "/connectors?expand=info&expand=status", nil, &expanded); err != nil {
+	if err := c.http.Do(ctx, "GET", "/connectors?expand=info&expand=status", nil, &expanded); err != nil {
 		return nil, fmt.Errorf("list connectors: %w", err)
 	}
 
@@ -100,7 +103,7 @@ func (c *Client) GetConnector(ctx context.Context, name string) (*ConnectorDetai
 		Config map[string]string `json:"config"`
 		Type   string            `json:"type"`
 	}
-	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/connectors/%s", escaped), nil, &connResp); err != nil {
+	if err := c.http.Do(ctx, "GET", fmt.Sprintf("/connectors/%s", escaped), nil, &connResp); err != nil {
 		return nil, fmt.Errorf("get connector %q: %w", name, err)
 	}
 
@@ -118,7 +121,7 @@ func (c *Client) GetConnector(ctx context.Context, name string) (*ConnectorDetai
 			Trace    string `json:"trace"`
 		} `json:"tasks"`
 	}
-	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/connectors/%s/status", escaped), nil, &statusResp); err != nil {
+	if err := c.http.Do(ctx, "GET", fmt.Sprintf("/connectors/%s/status", escaped), nil, &statusResp); err != nil {
 		return nil, fmt.Errorf("get connector status %q: %w", name, err)
 	}
 
@@ -155,7 +158,7 @@ func (c *Client) CreateConnector(ctx context.Context, req CreateConnectorRequest
 		Config map[string]string `json:"config"`
 		Type   string            `json:"type"`
 	}
-	if err := c.doJSON(ctx, http.MethodPost, "/connectors", body, &createResp); err != nil {
+	if err := c.http.Do(ctx, "POST", "/connectors", body, &createResp); err != nil {
 		return nil, fmt.Errorf("create connector %q: %w", req.Name, err)
 	}
 
@@ -167,7 +170,7 @@ func (c *Client) UpdateConnector(ctx context.Context, name string, config map[st
 	escaped := url.PathEscape(name)
 
 	var updateResp map[string]string
-	if err := c.doJSON(ctx, http.MethodPut, fmt.Sprintf("/connectors/%s/config", escaped), config, &updateResp); err != nil {
+	if err := c.http.Do(ctx, "PUT", fmt.Sprintf("/connectors/%s/config", escaped), config, &updateResp); err != nil {
 		return nil, fmt.Errorf("update connector %q: %w", name, err)
 	}
 
@@ -178,20 +181,8 @@ func (c *Client) UpdateConnector(ctx context.Context, name string, config map[st
 func (c *Client) DeleteConnector(ctx context.Context, name string) error {
 	escaped := url.PathEscape(name)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+fmt.Sprintf("/connectors/%s", escaped), nil)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+	if _, err := c.http.DoRaw(ctx, "DELETE", fmt.Sprintf("/connectors/%s", escaped), nil); err != nil {
 		return fmt.Errorf("delete connector %q: %w", name, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("kafka connect error (%d): %s", resp.StatusCode, string(body))
 	}
 
 	return nil
@@ -217,67 +208,8 @@ func (c *Client) doAction(ctx context.Context, name, action string) error {
 	escaped := url.PathEscape(name)
 	path := fmt.Sprintf("/connectors/%s/%s", escaped, action)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, nil)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+	if _, err := c.http.DoRaw(ctx, "POST", path, nil); err != nil {
 		return fmt.Errorf("%s connector %q: %w", action, name, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("kafka connect error (%d): %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
-// doJSON is a helper that performs an HTTP request and decodes the JSON response.
-// If body is non-nil, it is JSON-encoded and sent as the request body.
-// If dest is non-nil, the response body is JSON-decoded into it.
-func (c *Client) doJSON(ctx context.Context, method, path string, body any, dest any) error {
-	var bodyReader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("marshal request body: %w", err)
-		}
-		bodyReader = strings.NewReader(string(encoded))
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("kafka connect error (%d): %s", resp.StatusCode, string(respBody))
-	}
-
-	if dest != nil {
-		if err := json.Unmarshal(respBody, dest); err != nil {
-			return fmt.Errorf("decode response: %w", err)
-		}
 	}
 
 	return nil

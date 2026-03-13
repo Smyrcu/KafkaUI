@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { rowClassName } from "@/lib/utils";
 
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
@@ -16,7 +17,7 @@ export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
           </div>
           {/* Rows */}
           {Array.from({ length: rows }).map((_, i) => (
-            <div key={i} className={`flex gap-4 px-4 py-3 ${i % 2 === 1 ? "bg-muted/30" : ""}`}>
+            <div key={i} className={`flex gap-4 px-4 py-3 ${rowClassName(i)}`}>
               {Array.from({ length: cols }).map((_, j) => (
                 <Skeleton key={j} className="h-4 flex-1" />
               ))}

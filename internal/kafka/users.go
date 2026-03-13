@@ -43,11 +43,7 @@ func (c *Client) ListScramUsers(ctx context.Context) ([]ScramUser, error) {
 	}
 
 	if descResp.ErrorCode != 0 {
-		msg := ""
-		if descResp.ErrorMessage != nil {
-			msg = *descResp.ErrorMessage
-		}
-		return nil, fmt.Errorf("DescribeUserSCRAMCredentials failed with error code %d: %s", descResp.ErrorCode, msg)
+		return nil, fmt.Errorf("DescribeUserSCRAMCredentials failed with %s", kafkaErrMsg(descResp.ErrorCode, descResp.ErrorMessage))
 	}
 
 	var users []ScramUser
@@ -121,11 +117,7 @@ func (c *Client) UpsertScramUser(ctx context.Context, u UpsertScramUserRequest) 
 
 	for _, result := range alterResp.Results {
 		if result.ErrorCode != 0 {
-			msg := ""
-			if result.ErrorMessage != nil {
-				msg = *result.ErrorMessage
-			}
-			return fmt.Errorf("AlterUserSCRAMCredentials failed for user %q: error code %d: %s", result.User, result.ErrorCode, msg)
+			return fmt.Errorf("AlterUserSCRAMCredentials failed for user %q: %s", result.User, kafkaErrMsg(result.ErrorCode, result.ErrorMessage))
 		}
 	}
 
@@ -157,11 +149,7 @@ func (c *Client) DeleteScramUser(ctx context.Context, name string, mechanism str
 
 	for _, result := range alterResp.Results {
 		if result.ErrorCode != 0 {
-			msg := ""
-			if result.ErrorMessage != nil {
-				msg = *result.ErrorMessage
-			}
-			return fmt.Errorf("DeleteUserSCRAMCredentials failed for user %q: error code %d: %s", result.User, result.ErrorCode, msg)
+			return fmt.Errorf("DeleteUserSCRAMCredentials failed for user %q: %s", result.User, kafkaErrMsg(result.ErrorCode, result.ErrorMessage))
 		}
 	}
 

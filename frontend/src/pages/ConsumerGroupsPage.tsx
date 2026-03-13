@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -9,12 +9,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
+import { useSearchFilter } from "@/hooks/useSearchFilter";
 import { Users } from "lucide-react";
 import type { ConsumerGroupInfo } from "@/lib/api";
 
 export function ConsumerGroupsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
-  const [search, setSearch] = useState("");
+  const groupAccessor = useCallback((g: ConsumerGroupInfo) => g.name, []);
 
   const { data: groups, isLoading, error, refetch } = useQuery({
     queryKey: ["consumer-groups", clusterName],
@@ -22,9 +23,7 @@ export function ConsumerGroupsPage() {
     enabled: !!clusterName,
   });
 
-  const filteredGroups = groups?.filter((g) =>
-    g.name.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const { search, setSearch, filtered: filteredGroups } = useSearchFilter(groups ?? [], groupAccessor);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -33,7 +32,7 @@ export function ConsumerGroupsPage() {
   ];
 
   if (isLoading) return <><PageHeader title="Consumer Groups" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
-  if (error) return <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />;
+  if (error) return <><PageHeader title="Consumer Groups" breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
 
   return (
     <div>

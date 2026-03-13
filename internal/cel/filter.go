@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -149,14 +148,3 @@ func parseValue(raw string) ref.Val {
 	return types.String(raw)
 }
 
-// MatchMessage is a convenience for filtering with timestamp parsing from string.
-func MatchMessage(f *Filter, partition int32, offset int64, ts time.Time, key, value string, headers map[string]string) (bool, error) {
-	return f.Match(kafka.MessageRecord{
-		Partition: partition,
-		Offset:    offset,
-		Timestamp: ts,
-		Key:       key,
-		Value:     value,
-		Headers:   headers,
-	})
-}

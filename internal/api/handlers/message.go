@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,12 +23,10 @@ func NewMessageHandler(reg *kafka.Registry, maskingEngine *masking.Engine) *Mess
 }
 
 func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	topicName := chi.URLParam(r, "topicName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
@@ -109,7 +106,7 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := client.ConsumeMessages(ctx, topicName, req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "consuming messages", err)
 		return
 	}
 
@@ -123,7 +120,10 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 	if filter != nil {
 		filtered := make([]kafka.MessageRecord, 0, originalLimit)
 		for _, msg := range messages {
-			match, _ := filter.Match(msg)
+			match, err := filter.Match(msg)
+			if err != nil {
+				continue
+			}
 			if match {
 				filtered = append(filtered, msg)
 				if len(filtered) >= originalLimit {
@@ -138,24 +138,21 @@ func (h *MessageHandler) Browse(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MessageHandler) Produce(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
 	topicName := chi.URLParam(r, "topicName")
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var req kafka.ProduceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
 	record, err := client.ProduceMessage(r.Context(), topicName, req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "producing message", err)
 		return
 	}
 

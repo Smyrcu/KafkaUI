@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestUserHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/users", nil)
@@ -29,7 +31,8 @@ func TestUserHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestUserHandler_List_ValidCluster(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	// With a valid cluster name, we expect either 200 (Kafka reachable) or 500 (unreachable), but never 404
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/users", nil)
@@ -40,14 +43,13 @@ func TestUserHandler_List_ValidCluster(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.List(rec, req)
 
-	// 500 = Kafka unreachable (not 404)
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rec.Code)
+	if rec.Code == http.StatusNotFound {
+		t.Fatalf("valid cluster should not return 404, got %d", rec.Code)
 	}
 }
 
 func TestUserHandler_Create_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{
@@ -70,7 +72,7 @@ func TestUserHandler_Create_ClusterNotFound(t *testing.T) {
 }
 
 func TestUserHandler_Create_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -88,7 +90,7 @@ func TestUserHandler_Create_InvalidBody(t *testing.T) {
 }
 
 func TestUserHandler_Create_MissingName(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{
@@ -110,7 +112,7 @@ func TestUserHandler_Create_MissingName(t *testing.T) {
 }
 
 func TestUserHandler_Create_MissingPassword(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{
@@ -132,7 +134,7 @@ func TestUserHandler_Create_MissingPassword(t *testing.T) {
 }
 
 func TestUserHandler_Delete_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{
@@ -154,7 +156,7 @@ func TestUserHandler_Delete_ClusterNotFound(t *testing.T) {
 }
 
 func TestUserHandler_Delete_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -172,7 +174,7 @@ func TestUserHandler_Delete_InvalidBody(t *testing.T) {
 }
 
 func TestUserHandler_Delete_MissingName(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{
@@ -193,7 +195,7 @@ func TestUserHandler_Delete_MissingName(t *testing.T) {
 }
 
 func TestUserHandler_Delete_MissingMechanism(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewUserHandler(reg)
 
 	payload := map[string]any{

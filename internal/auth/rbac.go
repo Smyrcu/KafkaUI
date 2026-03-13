@@ -4,25 +4,6 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
-const (
-	ActionViewTopics         = "view_topics"
-	ActionCreateTopics       = "create_topics"
-	ActionDeleteTopics       = "delete_topics"
-	ActionViewMessages       = "view_messages"
-	ActionProduceMessages    = "produce_messages"
-	ActionViewConsumerGroups = "view_consumer_groups"
-	ActionResetOffsets       = "reset_offsets"
-	ActionViewSchemas        = "view_schemas"
-	ActionManageSchemas      = "manage_schemas"
-	ActionViewConnectors     = "view_connectors"
-	ActionManageConnectors   = "manage_connectors"
-	ActionExecuteKSQL        = "execute_ksql"
-	ActionViewACLs           = "view_acls"
-	ActionManageACLs         = "manage_acls"
-	ActionViewUsers          = "view_users"
-	ActionManageUsers        = "manage_users"
-)
-
 type RBAC struct {
 	rules []config.RBACRule
 }

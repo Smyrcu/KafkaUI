@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestMessageHandler_Browse_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/topics/test/messages", nil)
@@ -29,7 +31,7 @@ func TestMessageHandler_Browse_ClusterNotFound(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_InvalidPartition(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?partition=abc", nil)
@@ -47,7 +49,7 @@ func TestMessageHandler_Browse_InvalidPartition(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_InvalidLimit(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?limit=999", nil)
@@ -65,7 +67,7 @@ func TestMessageHandler_Browse_InvalidLimit(t *testing.T) {
 }
 
 func TestMessageHandler_Produce_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/clusters/nonexistent/topics/test/messages", nil)
@@ -83,7 +85,7 @@ func TestMessageHandler_Produce_ClusterNotFound(t *testing.T) {
 }
 
 func TestMessageHandler_Produce_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -102,7 +104,7 @@ func TestMessageHandler_Produce_InvalidBody(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_InvalidOffset(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?offset=notanumber", nil)
@@ -120,7 +122,7 @@ func TestMessageHandler_Browse_InvalidOffset(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_InvalidTimestamp(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?timestamp=not-a-date", nil)
@@ -138,7 +140,7 @@ func TestMessageHandler_Browse_InvalidTimestamp(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_LimitTooLow(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?limit=0", nil)
@@ -156,7 +158,7 @@ func TestMessageHandler_Browse_LimitTooLow(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_LimitNonNumeric(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/topics/test/messages?limit=abc", nil)
@@ -174,7 +176,7 @@ func TestMessageHandler_Browse_LimitNonNumeric(t *testing.T) {
 }
 
 func TestMessageHandler_Browse_ValidOffsetKeywords(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewMessageHandler(reg, nil)
 
 	for _, offset := range []string{"earliest", "latest"} {

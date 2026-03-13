@@ -19,16 +19,18 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
-
-type wsMessage struct {
-	Partition int32             `json:"partition"`
-	Offset    int64             `json:"offset"`
-	Timestamp time.Time         `json:"timestamp"`
-	Key       string            `json:"key"`
-	Value     string            `json:"value"`
-	Headers   map[string]string `json:"headers,omitempty"`
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		host := r.Host
+		if host == "" {
+			host = r.Header.Get("Host")
+		}
+		// Allow same-origin requests: origin must end with the host
+		return strings.HasSuffix(origin, "://"+host)
+	},
 }
 
 type controlMessage struct {
@@ -72,29 +74,15 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	cfg := client.Config()
-	seeds := strings.Split(cfg.BootstrapServers, ",")
-	opts := []kgo.Opt{
-		kgo.SeedBrokers(seeds...),
+	opts, err := kafka.BuildBaseOpts(client.Config())
+	if err != nil {
+		h.logger.Error("failed to build consumer opts for live tail", "error", err)
+		return
+	}
+	opts = append(opts,
 		kgo.ConsumeTopics(topicName),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()),
-	}
-	if cfg.SASL.Mechanism != "" {
-		saslOpt, saslErr := kafka.BuildSASLOpt(cfg.SASL)
-		if saslErr != nil {
-			h.logger.Error("SASL config failed for live tail", "error", saslErr)
-			return
-		}
-		opts = append(opts, saslOpt)
-	}
-	if cfg.TLS.Enabled {
-		tlsOpt, tlsErr := kafka.BuildTLSOpt(cfg.TLS)
-		if tlsErr != nil {
-			h.logger.Error("TLS config failed for live tail", "error", tlsErr)
-			return
-		}
-		opts = append(opts, tlsOpt)
-	}
+	)
 
 	consumer, err := kgo.NewClient(opts...)
 	if err != nil {
@@ -146,7 +134,7 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 				for _, hdr := range r.Headers {
 					headers[hdr.Key] = string(hdr.Value)
 				}
-				msg := wsMessage{
+				msg := kafka.MessageRecord{
 					Partition: r.Partition,
 					Offset:    r.Offset,
 					Timestamp: r.Timestamp,
@@ -157,15 +145,7 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 				// Apply CEL filter if provided
 				if filter != nil {
-					record := kafka.MessageRecord{
-						Partition: msg.Partition,
-						Offset:    msg.Offset,
-						Timestamp: msg.Timestamp,
-						Key:       msg.Key,
-						Value:     msg.Value,
-						Headers:   msg.Headers,
-					}
-					matched, matchErr := filter.Match(record)
+					matched, matchErr := filter.Match(msg)
 					if matchErr != nil {
 						h.logger.Error("CEL filter evaluation failed", "error", matchErr)
 						return
@@ -175,7 +155,11 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				data, _ := json.Marshal(msg)
+				data, err := json.Marshal(msg)
+				if err != nil {
+					h.logger.Error("failed to marshal live tail message", "error", err)
+					return
+				}
 				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 					cancel()
 				}

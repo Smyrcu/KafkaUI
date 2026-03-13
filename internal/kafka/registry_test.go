@@ -9,8 +9,8 @@ import (
 func TestRegistry_GetByName(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "cluster-a", BootstrapServers: "localhost:9092"},
-			{Name: "cluster-b", BootstrapServers: "localhost:9093"},
+			{Name: "cluster-a", BootstrapServers: "localhost:19092"},
+			{Name: "cluster-b", BootstrapServers: "localhost:19093"},
 		},
 	}
 
@@ -37,8 +37,8 @@ func TestRegistry_GetByName(t *testing.T) {
 func TestRegistry_List(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "alpha", BootstrapServers: "localhost:9092"},
-			{Name: "beta", BootstrapServers: "localhost:9093"},
+			{Name: "alpha", BootstrapServers: "localhost:19092"},
+			{Name: "beta", BootstrapServers: "localhost:19093"},
 		},
 	}
 
@@ -71,7 +71,7 @@ func TestRegistry_EmptyConfig(t *testing.T) {
 func TestRegistry_GetConfig(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "test", BootstrapServers: "host1:9092,host2:9092"},
+			{Name: "test", BootstrapServers: "host1:19092,host2:19092"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -84,8 +84,8 @@ func TestRegistry_GetConfig(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find config for 'test'")
 	}
-	if cc.BootstrapServers != "host1:9092,host2:9092" {
-		t.Errorf("expected bootstrap servers 'host1:9092,host2:9092', got %q", cc.BootstrapServers)
+	if cc.BootstrapServers != "host1:19092,host2:19092" {
+		t.Errorf("expected bootstrap servers 'host1:19092,host2:19092', got %q", cc.BootstrapServers)
 	}
 
 	_, ok = reg.GetConfig("nonexistent")
@@ -97,9 +97,9 @@ func TestRegistry_GetConfig(t *testing.T) {
 func TestRegistry_ListPreservesOrder(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "charlie", BootstrapServers: "localhost:9092"},
-			{Name: "alpha", BootstrapServers: "localhost:9093"},
-			{Name: "bravo", BootstrapServers: "localhost:9094"},
+			{Name: "charlie", BootstrapServers: "localhost:19092"},
+			{Name: "alpha", BootstrapServers: "localhost:19093"},
+			{Name: "bravo", BootstrapServers: "localhost:19094"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -125,7 +125,7 @@ func TestRegistry_ClientConfig(t *testing.T) {
 		Clusters: []config.ClusterConfig{
 			{
 				Name:             "test",
-				BootstrapServers: "kafka:9092",
+				BootstrapServers: "kafka:19092",
 				SASL: config.SASLConfig{
 					Mechanism: "PLAIN",
 					Username:  "user",
@@ -152,7 +152,7 @@ func TestRegistry_ClientConfig(t *testing.T) {
 func TestRegistry_AddCluster(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "existing", BootstrapServers: "localhost:9092"},
+			{Name: "existing", BootstrapServers: "localhost:19092"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -161,7 +161,7 @@ func TestRegistry_AddCluster(t *testing.T) {
 	}
 	defer reg.Close()
 
-	cc := config.ClusterConfig{Name: "new-cluster", BootstrapServers: "localhost:9093"}
+	cc := config.ClusterConfig{Name: "new-cluster", BootstrapServers: "localhost:19093"}
 	if err := reg.AddCluster(cc); err != nil {
 		t.Fatalf("unexpected error adding cluster: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestRegistry_AddCluster(t *testing.T) {
 func TestRegistry_AddCluster_Duplicate(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "existing", BootstrapServers: "localhost:9092"},
+			{Name: "existing", BootstrapServers: "localhost:19092"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -202,7 +202,7 @@ func TestRegistry_AddCluster_Duplicate(t *testing.T) {
 	}
 	defer reg.Close()
 
-	cc := config.ClusterConfig{Name: "existing", BootstrapServers: "localhost:9093"}
+	cc := config.ClusterConfig{Name: "existing", BootstrapServers: "localhost:19093"}
 	if err := reg.AddCluster(cc); err == nil {
 		t.Fatal("expected error for duplicate cluster name")
 	}
@@ -211,8 +211,8 @@ func TestRegistry_AddCluster_Duplicate(t *testing.T) {
 func TestRegistry_RemoveCluster(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "keep", BootstrapServers: "localhost:9092"},
-			{Name: "remove-me", BootstrapServers: "localhost:9093"},
+			{Name: "keep", BootstrapServers: "localhost:19092"},
+			{Name: "remove-me", BootstrapServers: "localhost:19093"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -246,10 +246,10 @@ func TestRegistry_RemoveCluster(t *testing.T) {
 	}
 }
 
-func TestRegistry_UpdateCluster(t *testing.T) {
+func TestRegistry_RemoveCluster_NotFound(t *testing.T) {
 	cfg := &config.Config{
 		Clusters: []config.ClusterConfig{
-			{Name: "test", BootstrapServers: "localhost:9092"},
+			{Name: "alpha", BootstrapServers: "localhost:19092"},
 		},
 	}
 	reg, err := NewRegistry(cfg)
@@ -258,7 +258,24 @@ func TestRegistry_UpdateCluster(t *testing.T) {
 	}
 	defer reg.Close()
 
-	updated := config.ClusterConfig{Name: "test", BootstrapServers: "newhost:9093"}
+	if err := reg.RemoveCluster("nonexistent"); err == nil {
+		t.Fatal("expected error when removing nonexistent cluster")
+	}
+}
+
+func TestRegistry_UpdateCluster(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "test", BootstrapServers: "localhost:19092"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	updated := config.ClusterConfig{Name: "test", BootstrapServers: "newhost:19093"}
 	if err := reg.UpdateCluster("test", updated); err != nil {
 		t.Fatalf("unexpected error updating cluster: %v", err)
 	}
@@ -267,8 +284,8 @@ func TestRegistry_UpdateCluster(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find config for 'test'")
 	}
-	if cc.BootstrapServers != "newhost:9093" {
-		t.Errorf("expected 'newhost:9093', got %q", cc.BootstrapServers)
+	if cc.BootstrapServers != "newhost:19093" {
+		t.Errorf("expected 'newhost:19093', got %q", cc.BootstrapServers)
 	}
 
 	// Verify client was replaced (new client works)
@@ -276,7 +293,72 @@ func TestRegistry_UpdateCluster(t *testing.T) {
 	if !ok {
 		t.Fatal("expected to find client 'test'")
 	}
-	if client.Config().BootstrapServers != "newhost:9093" {
-		t.Errorf("expected client config 'newhost:9093', got %q", client.Config().BootstrapServers)
+	if client.Config().BootstrapServers != "newhost:19093" {
+		t.Errorf("expected client config 'newhost:19093', got %q", client.Config().BootstrapServers)
+	}
+}
+
+func TestRegistry_UpdateCluster_RejectsRename(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "original", BootstrapServers: "localhost:19092"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	renamed := config.ClusterConfig{Name: "new-name", BootstrapServers: "localhost:19093"}
+	err = reg.UpdateCluster("original", renamed)
+	if err == nil {
+		t.Fatal("expected error when attempting to rename cluster")
+	}
+
+	// Verify the original cluster is still intact
+	client, ok := reg.Get("original")
+	if !ok {
+		t.Fatal("expected original cluster to still exist")
+	}
+	if client.Config().BootstrapServers != "localhost:19092" {
+		t.Errorf("expected original bootstrap servers unchanged, got %q", client.Config().BootstrapServers)
+	}
+}
+
+func TestRegistry_UpdateCluster_NotFound(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "alpha", BootstrapServers: "localhost:19092"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	cc := config.ClusterConfig{Name: "nonexistent", BootstrapServers: "localhost:19093"}
+	if err := reg.UpdateCluster("nonexistent", cc); err == nil {
+		t.Fatal("expected error when updating nonexistent cluster")
+	}
+}
+
+func TestRegistry_ClusterCount(t *testing.T) {
+	cfg := &config.Config{
+		Clusters: []config.ClusterConfig{
+			{Name: "a", BootstrapServers: "localhost:19092"},
+			{Name: "b", BootstrapServers: "localhost:19093"},
+			{Name: "c", BootstrapServers: "localhost:19094"},
+		},
+	}
+	reg, err := NewRegistry(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer reg.Close()
+
+	if reg.ClusterCount() != 3 {
+		t.Errorf("expected ClusterCount 3, got %d", reg.ClusterCount())
 	}
 }

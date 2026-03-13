@@ -9,10 +9,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
 func TestSchemaHandler_List_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/schemas", nil)
@@ -29,7 +31,7 @@ func TestSchemaHandler_List_ClusterNotFound(t *testing.T) {
 }
 
 func TestSchemaHandler_List_NoSchemaRegistry(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/schemas", nil)
@@ -46,7 +48,7 @@ func TestSchemaHandler_List_NoSchemaRegistry(t *testing.T) {
 }
 
 func TestSchemaHandler_Details_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/nonexistent/schemas/test", nil)
@@ -64,7 +66,7 @@ func TestSchemaHandler_Details_ClusterNotFound(t *testing.T) {
 }
 
 func TestSchemaHandler_Details_NoSchemaRegistry(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clusters/alpha/schemas/test", nil)
@@ -82,7 +84,7 @@ func TestSchemaHandler_Details_NoSchemaRegistry(t *testing.T) {
 }
 
 func TestSchemaHandler_Create_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	payload := map[string]any{"subject": "test", "schema": "{\"type\":\"string\"}"}
@@ -101,7 +103,7 @@ func TestSchemaHandler_Create_ClusterNotFound(t *testing.T) {
 }
 
 func TestSchemaHandler_Create_InvalidBody(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	body := bytes.NewBufferString("{invalid json}")
@@ -119,7 +121,7 @@ func TestSchemaHandler_Create_InvalidBody(t *testing.T) {
 }
 
 func TestSchemaHandler_Create_MissingSubject(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	payload := map[string]any{"schema": "{\"type\":\"string\"}"}
@@ -138,7 +140,7 @@ func TestSchemaHandler_Create_MissingSubject(t *testing.T) {
 }
 
 func TestSchemaHandler_Create_MissingSchema(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	payload := map[string]any{"subject": "test"}
@@ -157,7 +159,7 @@ func TestSchemaHandler_Create_MissingSchema(t *testing.T) {
 }
 
 func TestSchemaHandler_Delete_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/nonexistent/schemas/test", nil)
@@ -175,7 +177,7 @@ func TestSchemaHandler_Delete_ClusterNotFound(t *testing.T) {
 }
 
 func TestSchemaHandler_Delete_NoSchemaRegistry(t *testing.T) {
-	reg := mustCreateRegistry(t)
+	reg := testutil.MustCreateRegistry(t)
 	h := NewSchemaHandler(reg)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/clusters/alpha/schemas/test", nil)

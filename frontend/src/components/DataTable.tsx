@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { rowClassName } from "@/lib/utils";
 
 interface Column<T> {
   header: string;
@@ -41,7 +42,7 @@ export function DataTable<T>({ columns, data, itemName = "items", onRowClick }: 
           {data.map((row, i) => (
             <TableRow
               key={i}
-              className={`${i % 2 === 1 ? "bg-muted/30" : ""} ${onRowClick ? "cursor-pointer" : ""}`}
+              className={`${rowClassName(i)} ${onRowClick ? "cursor-pointer" : ""}`}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
             >
               {columns.map((col, j) => (

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -65,15 +66,14 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	brokers, err := client.Brokers(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("listing brokers: %v", err))
+		writeInternalError(w, "listing brokers for metrics", err)
 		return
 	}
 
@@ -143,11 +143,12 @@ func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 		key := fmt.Sprintf("%s:%d", clusterName, broker.ID)
 
 		if latest[i].err != nil {
+			slog.Error("metrics scrape failed", "cluster", clusterName, "broker", broker.ID, "error", latest[i].err)
 			results[i] = BrokerMetricsResponse{
 				ID:      broker.ID,
 				Host:    display,
 				History: h.store.Query(key, duration),
-				Error:   latest[i].err.Error(),
+				Error:   "scrape failed",
 			}
 			continue
 		}

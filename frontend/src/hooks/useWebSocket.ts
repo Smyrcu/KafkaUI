@@ -23,7 +23,12 @@ export function useWebSocket(url: string | null) {
     };
 
     ws.onmessage = (event) => {
-      const msg: MessageRecord = JSON.parse(event.data);
+      let msg: MessageRecord;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
       setMessages((prev) => [msg, ...prev].slice(0, 1000));
     };
 
@@ -41,7 +46,9 @@ export function useWebSocket(url: string | null) {
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.send(JSON.stringify({ action: 'stop' }));
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: 'stop' }));
+      }
       wsRef.current.close();
       wsRef.current = null;
     }

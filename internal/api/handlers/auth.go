@@ -3,7 +3,6 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -52,7 +51,8 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 
 	ip := r.RemoteAddr
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		ip = fwd
+		parts := strings.Split(fwd, ",")
+		ip = strings.TrimSpace(parts[len(parts)-1])
 	}
 	if !h.rateLimiter.Allow(ip) {
 		h.logger.Warn("login rate limited", "ip", ip)
@@ -64,8 +64,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -82,7 +81,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.sessions.CreateSession(w, r, *session); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session")
+		writeInternalError(w, "creating session", err)
 		return
 	}
 
@@ -117,7 +116,7 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(5 * time.Minute / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
 	})
 
 	http.Redirect(w, r, provider.AuthCodeURL(state), http.StatusTemporaryRedirect)
@@ -172,7 +171,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	userInfo, rawToken, err := provider.Exchange(r.Context(), code)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "oauth exchange failed: "+err.Error())
+		writeInternalError(w, "exchanging OIDC code", err)
 		return
 	}
 
@@ -182,13 +181,16 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Name:  userInfo.Name,
 		Roles: userInfo.Roles,
 	}); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create session: "+err.Error())
+		writeInternalError(w, "creating OIDC session", err)
 		return
 	}
 
 	redirectURI := "/"
 	if redirectCookie, err := r.Cookie("redirect_uri"); err == nil && redirectCookie.Value != "" {
-		redirectURI = redirectCookie.Value
+		uri := redirectCookie.Value
+		if strings.HasPrefix(uri, "/") && !strings.HasPrefix(uri, "//") {
+			redirectURI = uri
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "redirect_uri",
 			Value:    "",

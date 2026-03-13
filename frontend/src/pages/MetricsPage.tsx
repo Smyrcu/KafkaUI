@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown, WifiOff, Calendar, ChevronDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { getErrorMessage } from "@/lib/error-utils";
 
 const PRESETS = [
   { key: "live", shorthand: "LIVE", label: "Live", duration: "live", live: true },
@@ -101,10 +102,9 @@ function ThroughputChart({ history, range_ }: { history: TimestampedMetrics[]; r
         <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
         <YAxis tickFormatter={formatChartBytes} tick={{ fontSize: 11 }} width={65} />
         <Tooltip
-          formatter={((value: number | undefined, name?: string) => [
+          formatter={(value: number) => [
             formatBytes(value ?? 0),
-            name === "bytesIn" ? "Bytes In" : "Bytes Out",
-          ]) as any}
+          ]}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
         <defs>
@@ -135,7 +135,7 @@ function MessagesChart({ history, range_ }: { history: TimestampedMetrics[]; ran
         <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
         <YAxis tickFormatter={(v) => formatRate(v)} tick={{ fontSize: 11 }} width={65} />
         <Tooltip
-          formatter={((value: number | undefined) => [formatRate(value ?? 0), "Messages In"]) as any}
+          formatter={(value: number) => [formatRate(value ?? 0), "Messages In"]}
           contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
         />
         <Line type="monotone" dataKey="messagesIn" stroke="#fbbf24" strokeWidth={2.5} dot={false} />
@@ -363,7 +363,7 @@ export function MetricsPage() {
     const result = parseTimeInput(inputValue);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset(null as any);
+      setSelectedPreset("");
       setPickerOpen(false);
     }
   }
@@ -373,7 +373,7 @@ export function MetricsPage() {
     const result = parseTimeInput(example);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset(null as any);
+      setSelectedPreset("");
       setPickerOpen(false);
     }
   }
@@ -383,7 +383,7 @@ export function MetricsPage() {
     const from = new Date(calFrom).toISOString();
     const to = calTo ? new Date(calTo).toISOString() : new Date().toISOString();
     setCustomRange({ from, to });
-    setSelectedPreset(null as any);
+    setSelectedPreset("");
     setPickerOpen(false);
   }
 
@@ -393,10 +393,10 @@ export function MetricsPage() {
       ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
       : activePreset?.label ?? "Past 1 Hour";
 
-  if (isLoading) return <TableSkeleton rows={3} cols={4} />;
+  if (isLoading) return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><TableSkeleton rows={3} cols={4} /></>;
 
   if (error) {
-    const msg = (error as Error).message;
+    const msg = getErrorMessage(error);
     if (msg.includes("not configured")) {
       return (
         <div>
@@ -415,7 +415,7 @@ export function MetricsPage() {
         </div>
       );
     }
-    return <ErrorAlert message={msg} onRetry={() => refetch()} />;
+    return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   }
 
   const brokers = data?.brokers ?? [];

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,7 +39,7 @@ func (h *SchemaHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	subjects, err := client.ListSubjects(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "listing schemas", err)
 		return
 	}
 
@@ -57,7 +56,7 @@ func (h *SchemaHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 	details, err := client.GetSubjectDetails(r.Context(), subject)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "fetching schema details", err)
 		return
 	}
 
@@ -66,8 +65,7 @@ func (h *SchemaHandler) Details(w http.ResponseWriter, r *http.Request) {
 
 func (h *SchemaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req schema.CreateSchemaRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -87,7 +85,7 @@ func (h *SchemaHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	result, err := client.CreateSchema(r.Context(), req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "creating schema", err)
 		return
 	}
 
@@ -103,7 +101,7 @@ func (h *SchemaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := client.DeleteSubject(r.Context(), subject); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "deleting schema", err)
 		return
 	}
 

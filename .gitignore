@@ -22,11 +22,16 @@ Thumbs.db
 
 # Config with secrets
 config.yaml
+config.yaml.bak.*
 config.test-*.yaml
 !config.example.yaml
 
-# Design plans (may contain internal notes)
-docs/plans/
+# Internal docs (plans, notes, review artifacts)
+docs/
+
+# Dev environment artifacts
+dev/jmx-exporter/*.jar
+dev/kafka-config/
 
 # Environment
 .env
@@ -36,6 +41,9 @@ docs/plans/
 *.pem
 *.key
 *.crt
+
+# Code review reports
+code-review-*.md
 
 # Logs
 *.log

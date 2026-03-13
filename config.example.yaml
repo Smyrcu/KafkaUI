@@ -73,5 +73,5 @@ auth:
 clusters:
   - name: local
     bootstrap-servers: localhost:9092
-    metrics:
-      url: "http://localhost:8080/debug/mock-metrics"   # Dev mock; for production use "http://{host}:9404/metrics"
+    # metrics:
+    #   url: "http://{host}:9404/metrics"   # Prometheus JMX exporter endpoint ({host} replaced per broker)

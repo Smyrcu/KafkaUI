@@ -1,6 +1,12 @@
-.PHONY: dev dev-backend dev-frontend build build-frontend build-backend test test-backend test-frontend docker clean
+.PHONY: dev dev-env dev-env-down dev-backend dev-frontend build build-frontend build-backend test test-backend test-frontend docker clean
 
 # Development
+dev-env:
+	./scripts/start-dev-env.sh
+
+dev-env-down:
+	./scripts/start-dev-env.sh stop
+
 dev:
 	@echo "Starting development servers..."
 	$(MAKE) dev-backend & $(MAKE) dev-frontend & wait

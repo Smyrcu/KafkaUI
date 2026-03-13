@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, Database, Plug, Loader2 } from "lucide-react";
+import { getErrorMessage } from "@/lib/error-utils";
 
 const emptyForm: AddClusterRequest = {
   name: "",
@@ -108,7 +109,7 @@ export function SettingsClustersPage() {
       />
 
       {isLoading && <TableSkeleton rows={3} cols={3} />}
-      {error && <ErrorAlert message={(error as Error).message} onRetry={() => refetch()} />}
+      {error && <ErrorAlert error={error} onRetry={() => refetch()} />}
 
       {!isLoading && !error && allClusters.length === 0 && (
         <EmptyState
@@ -205,7 +206,7 @@ export function SettingsClustersPage() {
                 {testMutation.data.status === "ok" ? "Connection successful" : `Failed: ${testMutation.data.error}`}
               </p>
             )}
-            {mutationError && <p className="text-sm text-destructive">{(mutationError as Error).message}</p>}
+            {mutationError && <p className="text-sm text-destructive">{getErrorMessage(mutationError)}</p>}
           </div>
           <DialogFooter>
             <Button onClick={handleSubmit} disabled={isPending || !form.name || !form.bootstrapServers}>
@@ -224,7 +225,7 @@ export function SettingsClustersPage() {
           <p className="text-sm text-muted-foreground">
             Are you sure you want to delete <span className="font-medium text-foreground">{deleteConfirm}</span>? This action cannot be undone.
           </p>
-          {deleteMutation.error && <p className="text-sm text-destructive">{(deleteMutation.error as Error).message}</p>}
+          {deleteMutation.error && <p className="text-sm text-destructive">{getErrorMessage(deleteMutation.error)}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm)} disabled={deleteMutation.isPending}>

@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 )
@@ -18,16 +15,14 @@ func NewUserHandler(reg *kafka.Registry) *UserHandler {
 }
 
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	users, err := client.ListScramUsers(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "listing users", err)
 		return
 	}
 
@@ -35,16 +30,13 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
 	var req kafka.UpsertScramUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -59,9 +51,13 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Mechanism == "" {
 		req.Mechanism = "SCRAM-SHA-256"
 	}
+	if req.Mechanism != "SCRAM-SHA-256" && req.Mechanism != "SCRAM-SHA-512" {
+		writeError(w, http.StatusBadRequest, "mechanism must be SCRAM-SHA-256 or SCRAM-SHA-512")
+		return
+	}
 
 	if err := client.UpsertScramUser(r.Context(), req); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "creating user", err)
 		return
 	}
 
@@ -69,10 +65,8 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	clusterName := chi.URLParam(r, "clusterName")
-	client, ok := h.registry.Get(clusterName)
+	client, ok := getClient(h.registry, w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, "cluster not found")
 		return
 	}
 
@@ -80,8 +74,7 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 		Mechanism string `json:"mechanism"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -93,9 +86,13 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "mechanism is required")
 		return
 	}
+	if req.Mechanism != "SCRAM-SHA-256" && req.Mechanism != "SCRAM-SHA-512" {
+		writeError(w, http.StatusBadRequest, "mechanism must be SCRAM-SHA-256 or SCRAM-SHA-512")
+		return
+	}
 
 	if err := client.DeleteScramUser(r.Context(), req.Name, req.Mechanism); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, "deleting user", err)
 		return
 	}
 

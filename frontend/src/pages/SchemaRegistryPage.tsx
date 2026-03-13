@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -14,14 +14,18 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
+import { useSearchFilter } from "@/hooks/useSearchFilter";
+import { getErrorMessage } from "@/lib/error-utils";
 import { BookOpen, Plus } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { SchemaSubjectInfo } from "@/lib/api";
 
 export function SchemaRegistryPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const schemaAccessor = useCallback((s: SchemaSubjectInfo) => s.subject, []);
   const [newSubject, setNewSubject] = useState("");
   const [newSchemaType, setNewSchemaType] = useState("AVRO");
   const [newSchema, setNewSchema] = useState("");
@@ -55,9 +59,7 @@ export function SchemaRegistryPage() {
     },
   });
 
-  const filteredSchemas = schemas?.filter((s) =>
-    s.subject.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  const { search, setSearch, filtered: filteredSchemas } = useSearchFilter(schemas ?? [], schemaAccessor);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/" },
@@ -67,7 +69,7 @@ export function SchemaRegistryPage() {
 
   if (isLoading) return <><PageHeader title="Schema Registry" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
   if (error) {
-    const msg = (error as Error).message;
+    const msg = getErrorMessage(error);
     const notConfigured = msg.toLowerCase().includes("not configured");
     return (
       <div>
@@ -75,7 +77,7 @@ export function SchemaRegistryPage() {
         {notConfigured ? (
           <EmptyState icon={BookOpen} title="Schema Registry not configured" description="No Schema Registry URL is configured for this cluster. Add a schemaRegistry.url to your cluster configuration to manage schemas." />
         ) : (
-          <ErrorAlert message={msg} onRetry={() => refetch()} />
+          <ErrorAlert error={error} onRetry={() => refetch()} />
         )}
       </div>
     );
@@ -141,7 +143,7 @@ export function SchemaRegistryPage() {
                   {createMutation.isPending ? "Creating..." : "Create"}
                 </Button>
                 {createMutation.isError && (
-                  <ErrorAlert message={(createMutation.error as Error).message} />
+                  <ErrorAlert error={createMutation.error} />
                 )}
               </form>
             </DialogContent>
@@ -184,11 +186,7 @@ export function SchemaRegistryPage() {
                   variant="destructive"
                   size="sm"
                   disabled={deleteMutation.isPending}
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to delete schema "${s.subject}"?`)) {
-                      deleteMutation.mutate(s.subject);
-                    }
-                  }}
+                  onClick={() => setDeleteTarget(s.subject)}
                 >
                   Delete
                 </Button>
@@ -197,6 +195,14 @@ export function SchemaRegistryPage() {
           ]}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Schema"
+        description={`Are you sure you want to delete schema "${deleteTarget}"? This action cannot be undone.`}
+        onConfirm={() => { if (deleteTarget) { deleteMutation.mutate(deleteTarget); setDeleteTarget(null); } }}
+        destructive
+      />
     </div>
   );
 }

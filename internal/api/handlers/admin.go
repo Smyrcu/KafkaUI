@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -91,8 +90,7 @@ func (h *AdminHandler) ListClusters(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) AddCluster(w http.ResponseWriter, r *http.Request) {
 	var req AddClusterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -114,18 +112,18 @@ func (h *AdminHandler) AddCluster(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("validate") != "false" {
 		if err := testConnection(cc); err != nil {
-			writeError(w, http.StatusBadGateway, "connection test failed: "+err.Error())
+			writeError(w, http.StatusBadGateway, "connection test failed: unable to reach broker")
 			return
 		}
 	}
 
 	if err := h.dynamicCfg.Add(cc); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to persist cluster: "+err.Error())
+		writeInternalError(w, "saving dynamic config", err)
 		return
 	}
 
 	if err := h.registry.AddCluster(cc); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to add cluster to registry: "+err.Error())
+		writeInternalError(w, "registering cluster", err)
 		return
 	}
 
@@ -141,8 +139,7 @@ func (h *AdminHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req AddClusterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -157,18 +154,18 @@ func (h *AdminHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("validate") != "false" {
 		if err := testConnection(cc); err != nil {
-			writeError(w, http.StatusBadGateway, "connection test failed: "+err.Error())
+			writeError(w, http.StatusBadGateway, "connection test failed: unable to reach broker")
 			return
 		}
 	}
 
 	if err := h.dynamicCfg.Update(name, cc); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to persist cluster update: "+err.Error())
+		writeInternalError(w, "updating dynamic config", err)
 		return
 	}
 
 	if err := h.registry.UpdateCluster(name, cc); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update cluster in registry: "+err.Error())
+		writeInternalError(w, "updating cluster", err)
 		return
 	}
 
@@ -189,12 +186,12 @@ func (h *AdminHandler) DeleteCluster(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.dynamicCfg.Remove(name); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to remove cluster from config: "+err.Error())
+		writeInternalError(w, "removing dynamic config", err)
 		return
 	}
 
 	if err := h.registry.RemoveCluster(name); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to remove cluster from registry: "+err.Error())
+		writeInternalError(w, "removing cluster", err)
 		return
 	}
 
@@ -203,8 +200,7 @@ func (h *AdminHandler) DeleteCluster(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	var req AddClusterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
+	if !decodeBody(w, r, &req) {
 		return
 	}
 
@@ -213,7 +209,7 @@ func (h *AdminHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	if err := testConnection(cc); err != nil {
 		writeJSON(w, http.StatusOK, map[string]string{
 			"status": "error",
-			"error":  err.Error(),
+			"error":  "connection failed: unable to reach broker",
 		})
 		return
 	}

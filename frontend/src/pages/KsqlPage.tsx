@@ -84,7 +84,7 @@ export function KsqlPage() {
 
       {executeMutation.error && (
         <div className="mt-4">
-          <ErrorAlert message={(executeMutation.error as Error).message} />
+          <ErrorAlert error={executeMutation.error} />
         </div>
       )}
 

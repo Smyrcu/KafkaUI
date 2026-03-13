@@ -3,10 +3,8 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,32 +12,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 
-	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/testutil"
 )
 
-func mustCreateRegistry(t *testing.T) *kafka.Registry {
-	t.Helper()
-	cfg := &config.Config{
-		Clusters: []config.ClusterConfig{
-			{Name: "alpha", BootstrapServers: "localhost:9092"},
-		},
-	}
-	reg, err := kafka.NewRegistry(cfg)
-	if err != nil {
-		t.Fatalf("failed to create registry: %v", err)
-	}
-	t.Cleanup(reg.Close)
-	return reg
-}
-
-func testLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-}
-
 func TestLiveTailHandler_ClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testLogger())
+	reg := testutil.MustCreateRegistry(t)
+	h := NewLiveTailHandler(reg, testutil.TestLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters/nonexistent/topics/test/live", nil)
 	rctx := chi.NewRouteContext()
@@ -60,8 +39,8 @@ func TestLiveTailHandler_ClusterNotFound(t *testing.T) {
 }
 
 func TestLiveTailHandler_NonWebSocketRequest(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testLogger())
+	reg := testutil.MustCreateRegistry(t)
+	h := NewLiveTailHandler(reg, testutil.TestLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters/alpha/topics/test/live", nil)
 	rctx := chi.NewRouteContext()
@@ -80,8 +59,8 @@ func TestLiveTailHandler_NonWebSocketRequest(t *testing.T) {
 }
 
 func TestLiveTailHandler_MissingClusterParam(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testLogger())
+	reg := testutil.MustCreateRegistry(t)
+	h := NewLiveTailHandler(reg, testutil.TestLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters//topics/test/live", nil)
 	// Set up route context with empty clusterName.
@@ -100,8 +79,8 @@ func TestLiveTailHandler_MissingClusterParam(t *testing.T) {
 }
 
 func TestNewLiveTailHandler(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	logger := testLogger()
+	reg := testutil.MustCreateRegistry(t)
+	logger := testutil.TestLogger()
 	h := NewLiveTailHandler(reg, logger)
 
 	if h == nil {
@@ -116,8 +95,8 @@ func TestNewLiveTailHandler(t *testing.T) {
 }
 
 func TestLiveTailHandler_WebSocketUpgrade(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testLogger())
+	reg := testutil.MustCreateRegistry(t)
+	h := NewLiveTailHandler(reg, testutil.TestLogger())
 
 	// Create a test server with chi router to serve the WebSocket handler.
 	r := chi.NewRouter()
@@ -161,8 +140,8 @@ func TestLiveTailHandler_WebSocketUpgrade(t *testing.T) {
 }
 
 func TestLiveTailHandler_WebSocketClusterNotFound(t *testing.T) {
-	reg := mustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testLogger())
+	reg := testutil.MustCreateRegistry(t)
+	h := NewLiveTailHandler(reg, testutil.TestLogger())
 
 	r := chi.NewRouter()
 	r.Get("/ws/clusters/{clusterName}/topics/{topicName}/live", h.Handle)
@@ -191,8 +170,8 @@ func TestLiveTailHandler_WebSocketClusterNotFound(t *testing.T) {
 	}
 }
 
-func TestWsMessage_JSONRoundTrip(t *testing.T) {
-	original := wsMessage{
+func TestMessageRecord_JSONRoundTrip(t *testing.T) {
+	original := kafka.MessageRecord{
 		Partition: 3,
 		Offset:    42,
 		Timestamp: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
@@ -206,7 +185,7 @@ func TestWsMessage_JSONRoundTrip(t *testing.T) {
 		t.Fatalf("failed to marshal: %v", err)
 	}
 
-	var decoded wsMessage
+	var decoded kafka.MessageRecord
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
