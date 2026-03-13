@@ -180,7 +180,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="sm" className="text-xs opacity-50 pointer-events-none">
-              <span>v0.1.0</span>
+              <span>v{__APP_VERSION__}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
