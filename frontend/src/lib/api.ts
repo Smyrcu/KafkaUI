@@ -97,30 +97,32 @@ export interface ClusterOverview {
   status: string;
 }
 
-export interface BrokerMetricsData {
-  bytesInPerSec: number;
-  bytesOutPerSec: number;
-  messagesInPerSec: number;
-  underReplicatedPartitions: number;
-  activeControllerCount: number;
-  offlinePartitionsCount: number;
+export interface MetricSample {
+  labels?: Record<string, string>;
+  value: number;
 }
 
-export interface TimestampedMetrics {
+export interface MetricHistoryPoint {
   time: string;
-  metrics: BrokerMetricsData;
+  value: number;
 }
 
-export interface BrokerMetricsInfo {
-  id: number;
-  host: string;
-  metrics?: BrokerMetricsData;
-  history?: TimestampedMetrics[];
-  error?: string;
+export interface MetricDetail {
+  name: string;
+  help: string;
+  type: string;
+  current: MetricSample[];
+  history: MetricHistoryPoint[];
+}
+
+export interface MetricGroup {
+  name: string;
+  prefix: string;
+  metrics: MetricDetail[];
 }
 
 export interface MetricsResponse {
-  brokers: BrokerMetricsInfo[];
+  groups: MetricGroup[];
 }
 
 export interface SchemaSubjectInfo {
