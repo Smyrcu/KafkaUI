@@ -1,38 +1,51 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
-	"sync"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/metrics"
 )
 
+// MetricsHandler serves generic Prometheus metrics from the store.
 type MetricsHandler struct {
-	registry *kafka.Registry
-	scrapers map[string]*metrics.Scraper
-	store    *metrics.Store
+	store *metrics.Store
 }
 
-func NewMetricsHandler(reg *kafka.Registry, scrapers map[string]*metrics.Scraper, store *metrics.Store) *MetricsHandler {
-	return &MetricsHandler{registry: reg, scrapers: scrapers, store: store}
+// NewMetricsHandler creates a handler that reads metrics from the store.
+func NewMetricsHandler(store *metrics.Store) *MetricsHandler {
+	return &MetricsHandler{store: store}
 }
 
-type BrokerMetricsResponse struct {
-	ID      int32                        `json:"id"`
-	Host    string                       `json:"host"`
-	Metrics *metrics.BrokerMetrics       `json:"metrics,omitempty"`
-	History []metrics.TimestampedMetrics `json:"history,omitempty"`
-	Error   string                       `json:"error,omitempty"`
+// MetricGroup is a group of metrics sharing a common prefix.
+type MetricGroup struct {
+	Name    string         `json:"name"`
+	Prefix  string         `json:"prefix"`
+	Metrics []MetricDetail `json:"metrics"`
 }
 
+// MetricDetail is a single metric with current values and history.
+type MetricDetail struct {
+	Name    string                `json:"name"`
+	Help    string                `json:"help"`
+	Type    string                `json:"type"`
+	Current []metrics.Sample      `json:"current"`
+	History []MetricHistoryPoint  `json:"history"`
+}
+
+// MetricHistoryPoint is a single point in a metric's time-series.
+type MetricHistoryPoint struct {
+	Time  time.Time `json:"time"`
+	Value float64   `json:"value"`
+}
+
+// MetricsResponse is the API response for the metrics endpoint.
 type MetricsResponse struct {
-	Brokers []BrokerMetricsResponse `json:"brokers"`
+	Groups []MetricGroup `json:"groups"`
 }
 
 var rangeDurations = map[string]time.Duration{
@@ -52,114 +65,115 @@ var rangeDurations = map[string]time.Duration{
 	"14d": 14 * 24 * time.Hour,
 }
 
+// Metrics handles GET /api/v1/clusters/{clusterName}/metrics.
 func (h *MetricsHandler) Metrics(w http.ResponseWriter, r *http.Request) {
 	clusterName := chi.URLParam(r, "clusterName")
 
-	_, ok := h.scrapers[clusterName]
-	if !ok {
+	if !h.store.HasData(clusterName) {
 		writeError(w, http.StatusNotFound, "metrics not configured for this cluster")
 		return
 	}
 
-	if h.registry == nil {
-		writeError(w, http.StatusNotFound, "cluster not found")
-		return
-	}
+	duration := parseDuration(r)
 
-	client, ok := getClient(h.registry, w, r)
+	latest, ok := h.store.GetLatest(clusterName)
 	if !ok {
+		writeError(w, http.StatusNotFound, "metrics not configured or no data yet")
 		return
 	}
 
-	brokers, err := client.Brokers(r.Context())
-	if err != nil {
-		writeInternalError(w, "listing brokers for metrics", err)
-		return
-	}
+	groups := groupMetrics(latest, clusterName, h.store, duration)
+	writeJSON(w, http.StatusOK, MetricsResponse{Groups: groups})
+}
 
-	// Parse time range: either preset "range" param or custom "from"/"to" timestamps
-	var duration time.Duration
+func parseDuration(r *http.Request) time.Duration {
 	fromParam := r.URL.Query().Get("from")
 	toParam := r.URL.Query().Get("to")
 
 	if fromParam != "" {
 		fromTime, err := time.Parse(time.RFC3339, fromParam)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid 'from' timestamp, use RFC3339 format")
-			return
+			return time.Hour
 		}
 		toTime := time.Now()
 		if toParam != "" {
-			toTime, err = time.Parse(time.RFC3339, toParam)
-			if err != nil {
-				writeError(w, http.StatusBadRequest, "invalid 'to' timestamp, use RFC3339 format")
-				return
+			if t, err := time.Parse(time.RFC3339, toParam); err == nil {
+				toTime = t
 			}
 		}
-		duration = toTime.Sub(fromTime)
-		if duration <= 0 {
-			duration = time.Hour
+		d := toTime.Sub(fromTime)
+		if d <= 0 {
+			return time.Hour
 		}
-		if duration > 14*24*time.Hour {
-			duration = 14 * 24 * time.Hour
+		if d > 24*time.Hour {
+			return 24 * time.Hour
 		}
-	} else {
-		rangeParam := r.URL.Query().Get("range")
-		if rangeParam == "" {
-			rangeParam = "1h"
-		}
-		var found bool
-		duration, found = rangeDurations[rangeParam]
-		if !found {
-			duration = time.Hour
-		}
+		return d
 	}
 
-	// Get latest metrics (live scrape) in parallel
-	latest := make([]struct {
-		m   *metrics.BrokerMetrics
-		err error
-	}, len(brokers))
-	scraper := h.scrapers[clusterName]
-	var wg sync.WaitGroup
-
-	for i, broker := range brokers {
-		wg.Add(1)
-		go func(idx int, b kafka.BrokerInfo) {
-			defer wg.Done()
-			m, err := scraper.Scrape(r.Context(), b.Host)
-			if err != nil {
-				latest[idx].err = err
-				return
-			}
-			latest[idx].m = &m
-		}(i, broker)
+	rangeParam := r.URL.Query().Get("range")
+	if rangeParam == "" {
+		rangeParam = "1h"
 	}
-	wg.Wait()
+	if d, ok := rangeDurations[rangeParam]; ok {
+		return d
+	}
+	return time.Hour
+}
 
-	results := make([]BrokerMetricsResponse, len(brokers))
-	for i, broker := range brokers {
-		display := fmt.Sprintf("%s:%d", broker.Host, broker.Port)
-		key := fmt.Sprintf("%s:%d", clusterName, broker.ID)
+func groupMetrics(latest metrics.Snapshot, cluster string, store *metrics.Store, duration time.Duration) []MetricGroup {
+	grouped := make(map[string][]MetricDetail)
 
-		if latest[i].err != nil {
-			slog.Error("metrics scrape failed", "cluster", clusterName, "broker", broker.ID, "error", latest[i].err)
-			results[i] = BrokerMetricsResponse{
-				ID:      broker.ID,
-				Host:    display,
-				History: h.store.Query(key, duration),
-				Error:   "scrape failed",
-			}
-			continue
+	for name, fam := range latest {
+		prefix := metricPrefix(name)
+		history := store.QueryMetric(cluster, name, duration)
+		points := make([]MetricHistoryPoint, len(history))
+		for i, p := range history {
+			points[i] = MetricHistoryPoint{Time: p.Time, Value: p.Value}
 		}
 
-		results[i] = BrokerMetricsResponse{
-			ID:      broker.ID,
-			Host:    display,
-			Metrics: latest[i].m,
-			History: h.store.Query(key, duration),
+		detail := MetricDetail{
+			Name:    name,
+			Help:    fam.Help,
+			Type:    fam.Type,
+			Current: fam.Samples,
+			History: points,
 		}
+		grouped[prefix] = append(grouped[prefix], detail)
 	}
 
-	writeJSON(w, http.StatusOK, MetricsResponse{Brokers: results})
+	groups := make([]MetricGroup, 0, len(grouped))
+	for prefix, details := range grouped {
+		sort.Slice(details, func(i, j int) bool {
+			return details[i].Name < details[j].Name
+		})
+		groups = append(groups, MetricGroup{
+			Name:    groupDisplayName(prefix),
+			Prefix:  prefix,
+			Metrics: details,
+		})
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].Name < groups[j].Name
+	})
+	return groups
+}
+
+func metricPrefix(name string) string {
+	parts := strings.SplitN(name, "_", 3)
+	if len(parts) >= 2 {
+		return parts[0] + "_" + parts[1] + "_"
+	}
+	return name + "_"
+}
+
+func groupDisplayName(prefix string) string {
+	clean := strings.TrimSuffix(prefix, "_")
+	parts := strings.Split(clean, "_")
+	for i, p := range parts {
+		if len(p) > 0 {
+			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+		}
+	}
+	return strings.Join(parts, " ")
 }

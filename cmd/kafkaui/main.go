@@ -130,39 +130,22 @@ func initBasicAuth(cfg *config.Config, logger *slog.Logger) (*auth.BasicAuthenti
 
 // initMetrics creates per-cluster metrics scrapers, a shared store, and
 // starts the background collector if any scrapers are configured.
-func initMetrics(ctx context.Context, cfg *config.Config, registry *kafka.Registry, logger *slog.Logger) (map[string]*metrics.Scraper, *metrics.Store) {
+func initMetrics(ctx context.Context, cfg *config.Config, logger *slog.Logger) *metrics.Store {
 	scrapers := make(map[string]*metrics.Scraper)
-	listers := make(map[string]metrics.BrokerLister)
 	for _, cc := range cfg.Clusters {
 		if cc.Metrics.URL != "" {
 			scrapers[cc.Name] = metrics.NewScraper(cc.Metrics.URL)
-			clusterName := cc.Name
-			listers[clusterName] = func(ctx context.Context) ([]metrics.BrokerInfo, error) {
-				client, ok := registry.Get(clusterName)
-				if !ok {
-					return nil, fmt.Errorf("cluster %q not found", clusterName)
-				}
-				brokers, err := client.Brokers(ctx)
-				if err != nil {
-					return nil, err
-				}
-				result := make([]metrics.BrokerInfo, len(brokers))
-				for i, b := range brokers {
-					result[i] = metrics.BrokerInfo{ID: b.ID, Host: b.Host}
-				}
-				return result, nil
-			}
 			logger.Info("metrics scraper enabled", "cluster", cc.Name, "url", cc.Metrics.URL)
 		}
 	}
 
 	store := metrics.NewStore()
 	if len(scrapers) > 0 {
-		collector := metrics.NewCollector(store, scrapers, listers, logger)
+		collector := metrics.NewCollector(store, scrapers, logger)
 		go collector.Run(ctx)
 		logger.Info("metrics collector started", "clusters", len(scrapers))
 	}
-	return scrapers, store
+	return store
 }
 
 func main() {
@@ -221,7 +204,7 @@ func main() {
 	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
 	metricsCtx, metricsCancel := context.WithCancel(context.Background())
 	defer metricsCancel()
-	metricsScrapers, metricsStore := initMetrics(metricsCtx, cfg, registry, logger)
+	metricsStore := initMetrics(metricsCtx, cfg, logger)
 
 	router := api.NewRouter(api.RouterDeps{
 		Registry:           registry,
@@ -234,7 +217,6 @@ func main() {
 		BasicAuth:          basicAuth,
 		RateLimiter:        rateLimiter,
 		AuthTypes:          cfg.Auth.Types,
-		MetricsScrapers:    metricsScrapers,
 		MetricsStore:       metricsStore,
 		DynamicCfg:         dynamicCfg,
 		StaticClusterNames: staticClusterNames,

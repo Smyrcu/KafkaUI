@@ -23,7 +23,6 @@ type RouterDeps struct {
 	BasicAuth          *auth.BasicAuthenticator
 	RateLimiter        *auth.LoginRateLimiter
 	AuthTypes          []string
-	MetricsScrapers    map[string]*metrics.Scraper
 	MetricsStore       *metrics.Store
 	DynamicCfg         *config.DynamicConfig
 	StaticClusterNames []string
