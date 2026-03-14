@@ -36,12 +36,16 @@ type ServerConfig struct {
 }
 
 type AuthConfig struct {
-	Enabled bool            `yaml:"enabled"`
-	Types   []string        `yaml:"types"`
-	OIDC    OIDCConfig      `yaml:"oidc"`
-	Basic   BasicAuthConfig `yaml:"basic"`
-	Session SessionConfig   `yaml:"session"`
-	RBAC    []RBACRule      `yaml:"rbac"`
+	Enabled        bool                 `yaml:"enabled"`
+	Types          []string             `yaml:"types"`
+	DefaultRole    string               `yaml:"default-role"`
+	OIDC           OIDCConfig           `yaml:"oidc"`
+	OAuth2         OAuth2Config         `yaml:"oauth2"`
+	Basic          BasicAuthConfig      `yaml:"basic"`
+	Session        SessionConfig        `yaml:"session"`
+	RBAC           RBACConfig           `yaml:"rbac"`
+	AutoAssignment []AutoAssignmentRule `yaml:"auto-assignment"`
+	Storage        StorageConfig        `yaml:"storage"`
 }
 
 type BasicAuthConfig struct {
@@ -79,10 +83,46 @@ type SessionConfig struct {
 	MaxAge int    `yaml:"max-age"`
 }
 
+type OAuth2Config struct {
+	RedirectURL string           `yaml:"redirect-url"`
+	Providers   []OAuth2Provider `yaml:"providers"`
+}
+
+type OAuth2Provider struct {
+	Name         string   `yaml:"name"`
+	DisplayName  string   `yaml:"display-name"`
+	ClientID     string   `yaml:"client-id"`
+	ClientSecret string   `yaml:"client-secret"`
+	Scopes       []string `yaml:"scopes"`
+}
+
+type RBACConfig struct {
+	RoleGroups map[string][]string `yaml:"role-groups"`
+	Rules      []RBACRule          `yaml:"rules"`
+}
+
 type RBACRule struct {
 	Role     string   `yaml:"role"`
 	Clusters []string `yaml:"clusters"`
 	Actions  []string `yaml:"actions"`
+}
+
+type AutoAssignmentRule struct {
+	Role  string              `yaml:"role"`
+	Match AutoAssignmentMatch `yaml:"match"`
+}
+
+type AutoAssignmentMatch struct {
+	Authenticated bool     `yaml:"authenticated"`
+	Emails        []string `yaml:"emails"`
+	EmailDomains  []string `yaml:"email-domains"`
+	GitHubOrgs    []string `yaml:"github-orgs"`
+	GitHubTeams   []string `yaml:"github-teams"`
+	GitLabGroups  []string `yaml:"gitlab-groups"`
+}
+
+type StorageConfig struct {
+	Path string `yaml:"path"`
 }
 
 type ClusterConfig struct {

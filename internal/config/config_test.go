@@ -333,9 +333,10 @@ auth:
         password: "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWXYZ12"
         roles: [viewer]
   rbac:
-    - role: admin
-      clusters: ["*"]
-      actions: ["*"]
+    rules:
+      - role: admin
+        clusters: ["*"]
+        actions: ["*"]
 clusters:
   - name: test
     bootstrap-servers: localhost:9092
@@ -377,6 +378,80 @@ clusters:
 	}
 	if cfg.Clusters[0].Metrics.URL != "http://{host}:9404/metrics" {
 		t.Errorf("expected metrics URL, got %q", cfg.Clusters[0].Metrics.URL)
+	}
+}
+
+func TestLoad_FullAuthConfig(t *testing.T) {
+	yaml := `
+server:
+  port: 8080
+auth:
+  enabled: true
+  types: [basic, oidc, oauth2]
+  default-role: viewer
+  oauth2:
+    redirect-url: "http://localhost:8080/api/v1/auth/callback"
+    providers:
+      - name: github
+        display-name: "GitHub"
+        client-id: "gh-id"
+        client-secret: "gh-secret"
+        scopes: ["user:email", "read:org"]
+  rbac:
+    role-groups:
+      view: [view_topics, view_messages]
+      edit: [view, create_topics]
+      admin: [edit, manage_users]
+    rules:
+      - role: admin
+        clusters: ["*"]
+        actions: ["*"]
+  auto-assignment:
+    - role: viewer
+      match:
+        authenticated: true
+    - role: admin
+      match:
+        emails: ["admin@co.com"]
+        github-orgs: ["my-org"]
+  storage:
+    path: "data/test.db"
+clusters:
+  - name: local
+    bootstrap-servers: localhost:9092
+`
+	tmp := t.TempDir() + "/config.yaml"
+	os.WriteFile(tmp, []byte(yaml), 0644)
+
+	cfg, err := Load(tmp)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	if cfg.Auth.DefaultRole != "viewer" {
+		t.Errorf("expected default-role=viewer, got %q", cfg.Auth.DefaultRole)
+	}
+	if len(cfg.Auth.OAuth2.Providers) != 1 {
+		t.Fatalf("expected 1 oauth2 provider, got %d", len(cfg.Auth.OAuth2.Providers))
+	}
+	if cfg.Auth.OAuth2.Providers[0].Name != "github" {
+		t.Errorf("expected provider name=github, got %q", cfg.Auth.OAuth2.Providers[0].Name)
+	}
+	if len(cfg.Auth.RBAC.RoleGroups) != 3 {
+		t.Errorf("expected 3 role groups, got %d", len(cfg.Auth.RBAC.RoleGroups))
+	}
+	if len(cfg.Auth.RBAC.Rules) != 1 {
+		t.Errorf("expected 1 rbac rule, got %d", len(cfg.Auth.RBAC.Rules))
+	}
+	if len(cfg.Auth.AutoAssignment) != 2 {
+		t.Errorf("expected 2 auto-assignment rules, got %d", len(cfg.Auth.AutoAssignment))
+	}
+	if cfg.Auth.Storage.Path != "data/test.db" {
+		t.Errorf("expected storage path=data/test.db, got %q", cfg.Auth.Storage.Path)
+	}
+	adminRule := cfg.Auth.AutoAssignment[1]
+	if len(adminRule.Match.Emails) != 1 || len(adminRule.Match.GitHubOrgs) != 1 {
+		t.Errorf("expected admin rule match with 1 email + 1 github org")
 	}
 }
 
