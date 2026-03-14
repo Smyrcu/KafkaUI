@@ -58,10 +58,11 @@ func (s *Scraper) Scrape(ctx context.Context) (Snapshot, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("unexpected status %d from %s", resp.StatusCode, s.url)
 	}
 
-	return parseAllMetrics(resp.Body)
+	return parseAllMetrics(io.LimitReader(resp.Body, 50<<20))
 }
 
 func parseAllMetrics(r io.Reader) (Snapshot, error) {
@@ -102,6 +103,12 @@ func extractSampleValue(m *dto.Metric) float64 {
 	}
 	if u := m.GetUntyped(); u != nil {
 		return u.GetValue()
+	}
+	if s := m.GetSummary(); s != nil {
+		return s.GetSampleSum()
+	}
+	if h := m.GetHistogram(); h != nil {
+		return h.GetSampleSum()
 	}
 	return 0
 }

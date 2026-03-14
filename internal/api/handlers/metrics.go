@@ -54,15 +54,20 @@ var rangeDurations = map[string]time.Duration{
 	"10m": 10 * time.Minute,
 	"15m": 15 * time.Minute,
 	"30m": 30 * time.Minute,
+	"45m": 45 * time.Minute,
 	"1h":  time.Hour,
 	"3h":  3 * time.Hour,
+	"4h":  4 * time.Hour,
 	"6h":  6 * time.Hour,
 	"12h": 12 * time.Hour,
 	"1d":  24 * time.Hour,
 	"24h": 24 * time.Hour,
+	"2d":  2 * 24 * time.Hour,
 	"3d":  3 * 24 * time.Hour,
 	"7d":  7 * 24 * time.Hour,
 	"14d": 14 * 24 * time.Hour,
+	"15d": 15 * 24 * time.Hour,
+	"30d": 30 * 24 * time.Hour,
 }
 
 // Metrics handles GET /api/v1/clusters/{clusterName}/metrics.
@@ -105,8 +110,8 @@ func parseDuration(r *http.Request) time.Duration {
 		if d <= 0 {
 			return time.Hour
 		}
-		if d > 24*time.Hour {
-			return 24 * time.Hour
+		if d > 30*24*time.Hour {
+			return 30 * 24 * time.Hour
 		}
 		return d
 	}

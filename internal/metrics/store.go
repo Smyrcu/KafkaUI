@@ -104,7 +104,9 @@ func (s *Store) evict(cluster string) {
 			lo++
 		}
 		if lo > 0 {
-			s.series[cluster][name] = points[lo:]
+			remaining := make([]MetricPoint, len(points)-lo)
+			copy(remaining, points[lo:])
+			s.series[cluster][name] = remaining
 		}
 	}
 }

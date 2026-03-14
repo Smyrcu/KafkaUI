@@ -50,7 +50,7 @@ func (c *Collector) collect(ctx context.Context) {
 			defer wg.Done()
 			snap, err := s.Scrape(ctx)
 			if err != nil {
-				c.logger.Debug("failed to scrape metrics", "cluster", name, "error", err)
+				c.logger.Warn("failed to scrape metrics", "cluster", name, "error", err)
 				return
 			}
 			c.store.Append(name, snap)
