@@ -50,6 +50,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/readyz", healthHandler.Readiness)
 	r.Get("/readyz/{service}", healthHandler.ServiceCheck)
 
+	// Debug endpoints (dev only)
+	if deps.MockMetrics != nil {
+		r.Get("/debug/mock-metrics", deps.MockMetrics.ServeHTTP)
+	}
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
 		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)

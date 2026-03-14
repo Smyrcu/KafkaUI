@@ -204,6 +204,11 @@ func main() {
 	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
 	metricsCtx, metricsCancel := context.WithCancel(context.Background())
 	defer metricsCancel()
+	var mockMetricsHandler http.Handler
+	if cfg.Server.Debug {
+		mockMetricsHandler = metrics.MockHandler()
+		logger.Info("debug mode enabled — mock metrics endpoint active at /debug/mock-metrics")
+	}
 	metricsStore := initMetrics(metricsCtx, cfg, logger)
 
 	router := api.NewRouter(api.RouterDeps{
@@ -218,6 +223,7 @@ func main() {
 		RateLimiter:        rateLimiter,
 		AuthTypes:          cfg.Auth.Types,
 		MetricsStore:       metricsStore,
+		MockMetrics:        mockMetricsHandler,
 		DynamicCfg:         dynamicCfg,
 		StaticClusterNames: staticClusterNames,
 	})
@@ -232,6 +238,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", router)
 	mux.Handle("/ws/", router)
+	mux.Handle("/debug/", router)
 	mux.Handle("/healthz", router)
 	mux.Handle("/readyz", router)
 	mux.Handle("/readyz/", router)

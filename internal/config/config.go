@@ -32,6 +32,7 @@ type MaskingField struct {
 type ServerConfig struct {
 	Port     int    `yaml:"port"`
 	BasePath string `yaml:"base-path"`
+	Debug    bool   `yaml:"debug"`
 }
 
 type AuthConfig struct {
