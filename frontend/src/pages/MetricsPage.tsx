@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import * as chrono from "chrono-node";
+import * as chrono from "chrono-node/en";
 import { api } from "@/lib/api";
 import type { MetricGroup, MetricDetail, MetricHistoryPoint } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,10 +69,10 @@ function formatMetricValue(value: number, metricName: string): string {
 
 function formatTime(iso: string, range_: string): string {
   const d = new Date(iso);
-  if (["3d", "7d", "14d"].includes(range_)) {
+  if (["2d", "3d", "7d", "14d", "15d", "30d"].includes(range_)) {
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   }
-  if (["1d", "6h", "12h", "24h"].includes(range_)) {
+  if (["4h", "6h", "12h", "24h", "1d"].includes(range_)) {
     return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   }
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -82,9 +82,10 @@ function effectiveRange(custom: { from: string; to: string } | null, preset: str
   if (!custom) return preset;
   const ms = new Date(custom.to).getTime() - new Date(custom.from).getTime();
   const hours = ms / 3600000;
+  if (hours >= 168) return "30d";
   if (hours >= 72) return "7d";
   if (hours >= 24) return "1d";
-  if (hours >= 6) return "6h";
+  if (hours >= 4) return "4h";
   return "1h";
 }
 
@@ -125,11 +126,16 @@ function parseTimeInput(input: string): { from: Date; to: Date } | null {
     if (parsed) return { from: parsed, to: new Date() };
   }
 
-  const rangeParts = trimmed.split(/\s*[-–]\s*/);
-  if (rangeParts.length === 2 && rangeParts[0] && rangeParts[1]) {
-    const from = chrono.parseDate(rangeParts[0]);
-    const to = chrono.parseDate(rangeParts[1]);
-    if (from && to) return { from, to };
+  const dashIdx = trimmed.search(/\s+[-–]\s+/);
+  if (dashIdx > 0) {
+    const sep = trimmed.slice(dashIdx).match(/^\s+[-–]\s+/);
+    if (sep) {
+      const fromStr = trimmed.slice(0, dashIdx);
+      const toStr = trimmed.slice(dashIdx + sep[0].length);
+      const from = chrono.parseDate(fromStr);
+      const to = chrono.parseDate(toStr);
+      if (from && to) return { from, to };
+    }
   }
 
   const parsed = chrono.parseDate(trimmed);
@@ -299,7 +305,7 @@ function MetricGroupSection({ group, range_ }: { group: MetricGroup; range_: str
 export function MetricsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<string>("1h");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>("1h");
   const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [showMore, setShowMore] = useState(false);
@@ -326,6 +332,7 @@ export function MetricsPage() {
       }
       return api.metrics.get(clusterName!, apiRange);
     },
+    enabled: !!clusterName,
     refetchInterval: isAutoRefresh ? (isLive ? 5000 : 30000) : false,
   });
 
@@ -345,7 +352,7 @@ export function MetricsPage() {
     const result = parseTimeInput(inputValue);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset("");
+      setSelectedPreset(null);
       setPickerOpen(false);
     }
   }
@@ -355,7 +362,7 @@ export function MetricsPage() {
     const result = parseTimeInput(example);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset("");
+      setSelectedPreset(null);
       setPickerOpen(false);
     }
   }
@@ -365,7 +372,7 @@ export function MetricsPage() {
     const from = new Date(calFrom).toISOString();
     const to = calTo ? new Date(calTo).toISOString() : new Date().toISOString();
     setCustomRange({ from, to });
-    setSelectedPreset("");
+    setSelectedPreset(null);
     setPickerOpen(false);
   }
 
@@ -479,7 +486,7 @@ export function MetricsPage() {
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Fixed</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {["Mar 1", "Mar 1 – Mar 2", "3/1", "3/1 – 3/2 12:00pm – 6:00pm"].map((ex) => (
+                      {["Mar 1", "Mar 1 – Mar 2", "3/1", "3/1 12pm – 3/2 6pm"].map((ex) => (
                         <button key={ex} onClick={() => handleExampleClick(ex)} className="text-xs text-primary hover:underline cursor-pointer px-1.5 py-0.5 rounded bg-muted/50 hover:bg-muted transition-colors">
                           {ex}
                         </button>
@@ -527,6 +534,7 @@ export function MetricsPage() {
                     <button
                       key={p.key}
                       onClick={() => handlePresetSelect(p)}
+                      aria-current={selectedPreset === p.key && !customRange ? "true" : undefined}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
                         selectedPreset === p.key && !customRange ? "bg-accent" : "hover:bg-accent/50"
                       }`}
@@ -549,6 +557,7 @@ export function MetricsPage() {
                     <button
                       key={p.key}
                       onClick={() => handlePresetSelect(p)}
+                      aria-current={selectedPreset === p.key && !customRange ? "true" : undefined}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
                         selectedPreset === p.key && !customRange ? "bg-accent" : "hover:bg-accent/50"
                       }`}
@@ -564,6 +573,7 @@ export function MetricsPage() {
                 <div className="border-t mt-2 pt-2 space-y-1">
                   <button
                     onClick={() => setShowCalendar(!showCalendar)}
+                    aria-expanded={showCalendar}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors"
                   >
                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -582,6 +592,7 @@ export function MetricsPage() {
 
                   <button
                     onClick={() => setShowMore(!showMore)}
+                    aria-expanded={showMore}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors"
                   >
                     <span className="inline-flex items-center justify-center min-w-[36px] px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">...</span>
