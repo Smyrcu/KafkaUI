@@ -1,9 +1,9 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import * as chrono from "chrono-node";
+import * as chrono from "chrono-node/en";
 import { api } from "@/lib/api";
-import type { BrokerMetricsInfo, TimestampedMetrics } from "@/lib/api";
+import type { MetricGroup, MetricDetail, MetricHistoryPoint } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/PageSkeleton";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { BarChart3, ArrowDownToLine, ArrowUpFromLine, Mail, AlertTriangle, Crown, WifiOff, Calendar, ChevronDown } from "lucide-react";
+import { BarChart3, Calendar, ChevronDown, ChevronRight } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { getErrorMessage } from "@/lib/error-utils";
 
@@ -36,31 +36,43 @@ const MORE_PRESETS = [
   { key: "2w", shorthand: "2w", label: "Past 2 Weeks", duration: "14d" },
 ] as const;
 
-function formatRate(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M/s`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K/s`;
-  return `${value.toFixed(1)}/s`;
+function formatCompactNumber(value: number): string {
+  if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}G`;
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  if (Number.isInteger(value)) return value.toString();
+  return value.toFixed(2);
 }
 
-function formatBytes(value: number): string {
-  if (value >= 1_073_741_824) return `${(value / 1_073_741_824).toFixed(1)} GB/s`;
-  if (value >= 1_048_576) return `${(value / 1_048_576).toFixed(1)} MB/s`;
-  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB/s`;
-  return `${value.toFixed(0)} B/s`;
-}
-
-function formatChartBytes(value: number): string {
-  if (value >= 1_048_576) return `${(value / 1_048_576).toFixed(0)} MB`;
-  if (value >= 1024) return `${(value / 1024).toFixed(0)} KB`;
-  return `${value.toFixed(0)} B`;
+function formatMetricValue(value: number, metricName: string): string {
+  if (metricName.includes("bytes") || metricName.includes("memory")) {
+    if (Math.abs(value) >= 1_073_741_824) return `${(value / 1_073_741_824).toFixed(1)} GB`;
+    if (Math.abs(value) >= 1_048_576) return `${(value / 1_048_576).toFixed(1)} MB`;
+    if (Math.abs(value) >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${value.toFixed(0)} B`;
+  }
+  if (metricName.includes("seconds") || metricName.includes("duration")) {
+    if (value >= 3600) return `${(value / 3600).toFixed(1)}h`;
+    if (value >= 60) return `${(value / 60).toFixed(1)}m`;
+    return `${value.toFixed(1)}s`;
+  }
+  if (metricName.includes("milliseconds") || metricName.includes("_ms")) {
+    if (value >= 60000) return `${(value / 60000).toFixed(1)}m`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}s`;
+    return `${value.toFixed(0)}ms`;
+  }
+  if (metricName.includes("rate") || metricName.includes("persec")) {
+    return formatCompactNumber(value) + "/s";
+  }
+  return formatCompactNumber(value);
 }
 
 function formatTime(iso: string, range_: string): string {
   const d = new Date(iso);
-  if (["3d", "7d", "14d"].includes(range_)) {
+  if (["2d", "3d", "7d", "14d", "15d", "30d"].includes(range_)) {
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
   }
-  if (["1d", "6h", "12h", "24h"].includes(range_)) {
+  if (["4h", "6h", "12h", "24h", "1d"].includes(range_)) {
     return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   }
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -70,164 +82,17 @@ function effectiveRange(custom: { from: string; to: string } | null, preset: str
   if (!custom) return preset;
   const ms = new Date(custom.to).getTime() - new Date(custom.from).getTime();
   const hours = ms / 3600000;
+  if (hours >= 168) return "30d";
   if (hours >= 72) return "7d";
   if (hours >= 24) return "1d";
-  if (hours >= 6) return "6h";
+  if (hours >= 4) return "4h";
   return "1h";
-}
-
-function toChartData(history: TimestampedMetrics[], range_: string) {
-  return history.map((p) => ({
-    time: formatTime(p.time, range_),
-    bytesIn: p.metrics.bytesInPerSec,
-    bytesOut: p.metrics.bytesOutPerSec,
-    messagesIn: p.metrics.messagesInPerSec,
-  }));
-}
-
-function ThroughputChart({ history, range_ }: { history: TimestampedMetrics[]; range_: string }) {
-  const data = toChartData(history, range_);
-  if (data.length < 2) {
-    return (
-      <div className="flex items-center justify-center h-52 text-sm text-muted-foreground">
-        Collecting data... ({data.length} point{data.length !== 1 ? "s" : ""}, need at least 2)
-      </div>
-    );
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-        <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-        <YAxis tickFormatter={formatChartBytes} tick={{ fontSize: 11 }} width={65} />
-        <Tooltip
-          formatter={(value: number) => [
-            formatBytes(value ?? 0),
-          ]}
-          contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
-        />
-        <defs>
-          <linearGradient id="gradBytesIn" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="gradBytesOut" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <Line type="monotone" dataKey="bytesIn" stroke="#60a5fa" strokeWidth={2.5} dot={false} name="bytesIn" />
-        <Line type="monotone" dataKey="bytesOut" stroke="#4ade80" strokeWidth={2.5} dot={false} name="bytesOut" />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-function MessagesChart({ history, range_ }: { history: TimestampedMetrics[]; range_: string }) {
-  const data = toChartData(history, range_);
-  if (data.length < 2) return null;
-
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-        <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-        <YAxis tickFormatter={(v) => formatRate(v)} tick={{ fontSize: 11 }} width={65} />
-        <Tooltip
-          formatter={(value: number) => [formatRate(value ?? 0), "Messages In"]}
-          contentStyle={{ fontSize: 12, backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 6 }}
-        />
-        <Line type="monotone" dataKey="messagesIn" stroke="#fbbf24" strokeWidth={2.5} dot={false} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-function BrokerSection({ broker, range_ }: { broker: BrokerMetricsInfo; range_: string }) {
-  if (broker.error) {
-    return (
-      <Card className="animate-scale-in col-span-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Broker {broker.id}</CardTitle>
-            <Badge variant="destructive">error</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">{broker.host}</p>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-destructive">{broker.error}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const m = broker.metrics!;
-  const history = broker.history ?? [];
-  const stats = [
-    { label: "Bytes In", value: formatBytes(m.bytesInPerSec), icon: ArrowDownToLine, warn: false },
-    { label: "Bytes Out", value: formatBytes(m.bytesOutPerSec), icon: ArrowUpFromLine, warn: false },
-    { label: "Messages In", value: formatRate(m.messagesInPerSec), icon: Mail, warn: false },
-    { label: "Under-replicated", value: String(m.underReplicatedPartitions), icon: AlertTriangle, warn: m.underReplicatedPartitions > 0 },
-    { label: "Active Controller", value: String(m.activeControllerCount), icon: Crown, warn: false },
-    { label: "Offline Partitions", value: String(m.offlinePartitionsCount), icon: WifiOff, warn: m.offlinePartitionsCount > 0 },
-  ];
-
-  return (
-    <>
-      <Card className="animate-scale-in">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Broker {broker.id}</CardTitle>
-            <Badge variant="success">healthy</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">{broker.host}</p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3">
-            {stats.map((s) => (
-              <div key={s.label} className="flex items-center gap-2">
-                <s.icon className={`h-4 w-4 ${s.warn ? "text-destructive" : "text-muted-foreground"}`} />
-                <div>
-                  <p className={`text-sm font-medium ${s.warn ? "text-destructive" : ""}`}>{s.value}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="animate-scale-in lg:col-span-2">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Throughput — Broker {broker.id}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ThroughputChart history={history} range_={range_} />
-        </CardContent>
-      </Card>
-
-      <Card className="animate-scale-in lg:col-span-3">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Messages/s — Broker {broker.id}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MessagesChart history={history} range_={range_} />
-        </CardContent>
-      </Card>
-    </>
-  );
 }
 
 function parseTimeInput(input: string): { from: Date; to: Date } | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  // Unix timestamp range: "1234567890 - 1234567899"
   const unixMatch = trimmed.match(/^(\d{9,13})\s*[-–]\s*(\d{9,13})$/);
   if (unixMatch) {
     let from = parseInt(unixMatch[1]);
@@ -237,7 +102,6 @@ function parseTimeInput(input: string): { from: Date; to: Date } | null {
     return { from: new Date(from), to: new Date(to) };
   }
 
-  // Simple relative: "45m", "12h", "2d", "1w", "1mo"
   const relMatch = trimmed.match(/^(\d+)\s*(m|min|h|hour|d|day|w|week|mo|month)s?$/i);
   if (relMatch) {
     const n = parseInt(relMatch[1]);
@@ -250,29 +114,30 @@ function parseTimeInput(input: string): { from: Date; to: Date } | null {
     return { from: new Date(Date.now() - n * (msMap[unit] ?? 3600000)), to: new Date() };
   }
 
-  // "since X" (growing range)
   const sinceMatch = trimmed.match(/^since\s+(.+)$/i);
   if (sinceMatch) {
     const parsed = chrono.parseDate(sinceMatch[1]);
     if (parsed) return { from: parsed, to: new Date() };
   }
 
-  // "X to now"
   const toNowMatch = trimmed.match(/^(.+)\s+to\s+now$/i);
   if (toNowMatch) {
     const parsed = chrono.parseDate(toNowMatch[1]);
     if (parsed) return { from: parsed, to: new Date() };
   }
 
-  // Range: "X - Y" or "X – Y"
-  const rangeParts = trimmed.split(/\s*[-–]\s*/);
-  if (rangeParts.length === 2 && rangeParts[0] && rangeParts[1]) {
-    const from = chrono.parseDate(rangeParts[0]);
-    const to = chrono.parseDate(rangeParts[1]);
-    if (from && to) return { from, to };
+  const dashIdx = trimmed.search(/\s+[-–]\s+/);
+  if (dashIdx > 0) {
+    const sep = trimmed.slice(dashIdx).match(/^\s+[-–]\s+/);
+    if (sep) {
+      const fromStr = trimmed.slice(0, dashIdx);
+      const toStr = trimmed.slice(dashIdx + sep[0].length);
+      const from = chrono.parseDate(fromStr);
+      const to = chrono.parseDate(toStr);
+      if (from && to) return { from, to };
+    }
   }
 
-  // Single date/expression
   const parsed = chrono.parseDate(trimmed);
   if (parsed) return { from: parsed, to: new Date() };
 
@@ -312,25 +177,148 @@ function parseDurationMs(d: string): number {
   return n * 86400000;
 }
 
+// ── Generic Chart ────────────────────────────────────────
+
+function GenericChart({ history, range_, name }: { history: MetricHistoryPoint[]; range_: string; name: string }) {
+  const data = history.map((p) => ({
+    time: formatTime(p.time, range_),
+    value: p.value,
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+        <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+        <YAxis tick={{ fontSize: 11 }} width={65} tickFormatter={(v) => formatCompactNumber(v)} />
+        <Tooltip
+          formatter={(value: number) => [formatMetricValue(value, name), name]}
+          contentStyle={{
+            fontSize: 12,
+            backgroundColor: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: 6,
+          }}
+        />
+        <Line type="monotone" dataKey="value" stroke="#60a5fa" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ── Metric Row ───────────────────────────────────────────
+
+function MetricRow({ metric, prefix, selected, onSelect, range_ }: {
+  metric: MetricDetail;
+  prefix: string;
+  selected: boolean;
+  onSelect: () => void;
+  range_: string;
+}) {
+  const shortName = metric.name.replace(prefix, "");
+  const primarySample = metric.current[0];
+
+  return (
+    <>
+      <tr onClick={onSelect} className="cursor-pointer hover:bg-muted/50 border-t">
+        <td className="py-2 font-mono text-xs" title={metric.help}>
+          {shortName}
+        </td>
+        <td className="py-2">
+          {primarySample?.labels && Object.keys(primarySample.labels).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(primarySample.labels).map(([k, v]) => (
+                <Badge key={k} variant="outline" className="text-[10px] font-mono">
+                  {k}={v}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </td>
+        <td className="py-2 text-right font-mono text-xs">
+          <Badge variant="secondary">{formatMetricValue(primarySample?.value ?? 0, metric.name)}</Badge>
+        </td>
+        <td className="py-2 pl-2 text-right">
+          <Badge variant="outline" className="text-[10px]">{metric.type}</Badge>
+        </td>
+      </tr>
+      {selected && metric.history.length >= 2 && (
+        <tr>
+          <td colSpan={4} className="pb-4 pt-2">
+            <GenericChart history={metric.history} range_={range_} name={shortName} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+// ── Metric Group Section ─────────────────────────────────
+
+function MetricGroupSection({ group, range_ }: { group: MetricGroup; range_: string }) {
+  const [expanded, setExpanded] = useState(true);
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+
+  return (
+    <Card className="animate-scale-in">
+      <CardHeader onClick={() => setExpanded(!expanded)} className="cursor-pointer py-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {group.name}
+          </CardTitle>
+          <Badge variant="secondary">{group.metrics.length} metrics</Badge>
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="pt-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground">
+                <th className="pb-2">Metric</th>
+                <th className="pb-2">Labels</th>
+                <th className="pb-2 text-right">Value</th>
+                <th className="pb-2 text-right">Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.metrics.map((m) => (
+                <MetricRow
+                  key={m.name}
+                  metric={m}
+                  prefix={group.prefix}
+                  selected={selectedMetric === m.name}
+                  onSelect={() => setSelectedMetric(selectedMetric === m.name ? null : m.name)}
+                  range_={range_}
+                />
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────
+
 export function MetricsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<string>("1h");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>("1h");
   const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [showMore, setShowMore] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [calFrom, setCalFrom] = useState("");
   const [calTo, setCalTo] = useState("");
+  const [search, setSearch] = useState("");
   const liveStartRef = useRef<string | null>(null);
 
   const isLive = selectedPreset === "live";
   const activePreset = [...PRESETS, ...MORE_PRESETS].find((p) => p.key === selectedPreset);
   const isAutoRefresh = selectedPreset !== null && !customRange;
 
-  // For LIVE mode: growing range from activation time to now
-  // For presets: sliding window via range param
-  // For custom: fixed from/to
   const apiRange = customRange ? undefined : (isLive ? undefined : (activePreset?.duration ?? "1h"));
   const liveFrom = liveStartRef.current;
   const { data, isLoading, error, refetch } = useQuery({
@@ -344,6 +332,7 @@ export function MetricsPage() {
       }
       return api.metrics.get(clusterName!, apiRange);
     },
+    enabled: !!clusterName,
     refetchInterval: isAutoRefresh ? (isLive ? 5000 : 30000) : false,
   });
 
@@ -363,7 +352,7 @@ export function MetricsPage() {
     const result = parseTimeInput(inputValue);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset("");
+      setSelectedPreset(null);
       setPickerOpen(false);
     }
   }
@@ -373,7 +362,7 @@ export function MetricsPage() {
     const result = parseTimeInput(example);
     if (result) {
       setCustomRange({ from: result.from.toISOString(), to: result.to.toISOString() });
-      setSelectedPreset("");
+      setSelectedPreset(null);
       setPickerOpen(false);
     }
   }
@@ -383,7 +372,7 @@ export function MetricsPage() {
     const from = new Date(calFrom).toISOString();
     const to = calTo ? new Date(calTo).toISOString() : new Date().toISOString();
     setCustomRange({ from, to });
-    setSelectedPreset("");
+    setSelectedPreset(null);
     setPickerOpen(false);
   }
 
@@ -393,45 +382,63 @@ export function MetricsPage() {
       ? formatDateRange(new Date(customRange.from), new Date(customRange.to))
       : activePreset?.label ?? "Past 1 Hour";
 
-  if (isLoading) return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><TableSkeleton rows={3} cols={4} /></>;
+  const breadcrumbs = [
+    { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
+    { label: "Metrics" },
+  ];
+
+  if (isLoading) return <><PageHeader title="Metrics" breadcrumbs={breadcrumbs} /><TableSkeleton rows={3} cols={4} /></>;
 
   if (error) {
     const msg = getErrorMessage(error);
     if (msg.includes("not configured")) {
       return (
         <div>
-          <PageHeader
-            title="Metrics"
-            breadcrumbs={[
-              { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
-              { label: "Metrics" },
-            ]}
-          />
+          <PageHeader title="Metrics" breadcrumbs={breadcrumbs} />
           <EmptyState
             icon={BarChart3}
             title="Metrics not configured"
-            description="Add a metrics URL to this cluster's configuration to enable broker metrics. Requires Prometheus JMX Exporter on each broker."
+            description="Add a metrics URL to this cluster's configuration to enable Prometheus metrics collection."
           />
         </div>
       );
     }
-    return <><PageHeader title="Metrics" breadcrumbs={[{ label: clusterName!, href: `/clusters/${clusterName}/brokers` }, { label: "Metrics" }]} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
+    return <><PageHeader title="Metrics" breadcrumbs={breadcrumbs} /><ErrorAlert error={error} onRetry={() => refetch()} /></>;
   }
 
-  const brokers = data?.brokers ?? [];
+  const groups = data?.groups ?? [];
+
+  const filteredGroups = groups
+    .map((g) => ({
+      ...g,
+      metrics: g.metrics.filter((m) =>
+        m.name.toLowerCase().includes(search.toLowerCase()) ||
+        m.help.toLowerCase().includes(search.toLowerCase()) ||
+        (m.current[0]?.labels && JSON.stringify(m.current[0].labels).toLowerCase().includes(search.toLowerCase()))
+      ),
+    }))
+    .filter((g) => g.metrics.length > 0);
+
+  const currentRange = isLive
+    ? effectiveRange(liveFrom ? { from: liveFrom, to: new Date().toISOString() } : null, "1h")
+    : effectiveRange(customRange, apiRange ?? "1h");
 
   return (
     <div>
       <PageHeader
         title="Metrics"
-        breadcrumbs={[
-          { label: clusterName!, href: `/clusters/${clusterName}/brokers` },
-          { label: "Metrics" },
-        ]}
-        description="Broker metrics from Prometheus JMX Exporter (auto-refreshes every 30s)"
+        breadcrumbs={breadcrumbs}
+        description="Prometheus metrics from configured endpoint"
       />
 
-      <div className="mb-4">
+      <div className="flex gap-3 mb-4">
+        <Input
+          placeholder="Search metrics..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-md h-9"
+        />
+
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="h-9 gap-2 px-3 text-sm font-normal">
@@ -479,7 +486,7 @@ export function MetricsPage() {
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Fixed</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {["Mar 1", "Mar 1 – Mar 2", "3/1", "3/1 – 3/2 12:00pm – 6:00pm"].map((ex) => (
+                      {["Mar 1", "Mar 1 – Mar 2", "3/1", "3/1 12pm – 3/2 6pm"].map((ex) => (
                         <button key={ex} onClick={() => handleExampleClick(ex)} className="text-xs text-primary hover:underline cursor-pointer px-1.5 py-0.5 rounded bg-muted/50 hover:bg-muted transition-colors">
                           {ex}
                         </button>
@@ -527,6 +534,7 @@ export function MetricsPage() {
                     <button
                       key={p.key}
                       onClick={() => handlePresetSelect(p)}
+                      aria-current={selectedPreset === p.key && !customRange ? "true" : undefined}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
                         selectedPreset === p.key && !customRange ? "bg-accent" : "hover:bg-accent/50"
                       }`}
@@ -549,6 +557,7 @@ export function MetricsPage() {
                     <button
                       key={p.key}
                       onClick={() => handlePresetSelect(p)}
+                      aria-current={selectedPreset === p.key && !customRange ? "true" : undefined}
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
                         selectedPreset === p.key && !customRange ? "bg-accent" : "hover:bg-accent/50"
                       }`}
@@ -564,6 +573,7 @@ export function MetricsPage() {
                 <div className="border-t mt-2 pt-2 space-y-1">
                   <button
                     onClick={() => setShowCalendar(!showCalendar)}
+                    aria-expanded={showCalendar}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors"
                   >
                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -582,9 +592,10 @@ export function MetricsPage() {
 
                   <button
                     onClick={() => setShowMore(!showMore)}
+                    aria-expanded={showMore}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent/50 transition-colors"
                   >
-                    <span className="inline-flex items-center justify-center min-w-[36px] px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">•••</span>
+                    <span className="inline-flex items-center justify-center min-w-[36px] px-1.5 py-0.5 rounded text-[10px] font-mono bg-muted text-muted-foreground">...</span>
                     <span className="text-xs">More</span>
                   </button>
                 </div>
@@ -594,11 +605,19 @@ export function MetricsPage() {
         </Popover>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {brokers.map((broker) => (
-          <BrokerSection key={broker.id} broker={broker} range_={isLive ? effectiveRange(liveFrom ? { from: liveFrom, to: new Date().toISOString() } : null, "1h") : effectiveRange(customRange, apiRange ?? "1h")} />
-        ))}
-      </div>
+      {filteredGroups.length === 0 ? (
+        <EmptyState
+          icon={BarChart3}
+          title={search ? "No metrics match" : "No metrics data yet"}
+          description={search ? "Try a different search term." : "Collecting data... metrics will appear shortly."}
+        />
+      ) : (
+        <div className="space-y-4">
+          {filteredGroups.map((group) => (
+            <MetricGroupSection key={group.prefix} group={group} range_={currentRange} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

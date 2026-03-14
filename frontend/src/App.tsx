@@ -19,9 +19,10 @@ import { ConnectorDetailPage } from "@/pages/ConnectorDetailPage";
 import { KsqlPage } from "@/pages/KsqlPage";
 import { AclPage } from "@/pages/AclPage";
 import { UsersPage } from "@/pages/UsersPage";
-import { MetricsPage } from "@/pages/MetricsPage";
 import { SettingsClustersPage } from "@/pages/SettingsClustersPage";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
+
+const MetricsPage = lazy(() => import("./pages/MetricsPage").then(m => ({ default: m.MetricsPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -69,7 +70,7 @@ export default function App() {
                   <Route path="/clusters/:clusterName/ksql" element={<KsqlPage />} />
                   <Route path="/clusters/:clusterName/acl" element={<AclPage />} />
                   <Route path="/clusters/:clusterName/users" element={<UsersPage />} />
-                  <Route path="/clusters/:clusterName/metrics" element={<MetricsPage />} />
+                  <Route path="/clusters/:clusterName/metrics" element={<Suspense fallback={null}><MetricsPage /></Suspense>} />
                   <Route path="/settings/clusters" element={<SettingsClustersPage />} />
                 </Route>
               </Routes>

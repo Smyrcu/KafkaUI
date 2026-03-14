@@ -2,37 +2,26 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 )
 
-// BrokerInfo is the minimal broker info needed for scraping.
-type BrokerInfo struct {
-	ID   int32
-	Host string
-}
-
-// BrokerLister returns broker addresses for scraping.
-type BrokerLister func(ctx context.Context) ([]BrokerInfo, error)
-
-// Collector periodically scrapes metrics from all brokers and stores them.
+// Collector periodically scrapes metrics from all configured endpoints.
 type Collector struct {
 	store    *Store
 	scrapers map[string]*Scraper
-	listers  map[string]BrokerLister
 	logger   *slog.Logger
 	interval time.Duration
 }
 
-func NewCollector(store *Store, scrapers map[string]*Scraper, listers map[string]BrokerLister, logger *slog.Logger) *Collector {
+// NewCollector creates a collector that scrapes each cluster's metrics endpoint.
+func NewCollector(store *Store, scrapers map[string]*Scraper, logger *slog.Logger) *Collector {
 	return &Collector{
 		store:    store,
 		scrapers: scrapers,
-		listers:  listers,
 		logger:   logger,
-		interval: 5 * time.Second,
+		interval: 30 * time.Second,
 	}
 }
 
@@ -54,32 +43,18 @@ func (c *Collector) Run(ctx context.Context) {
 }
 
 func (c *Collector) collect(ctx context.Context) {
+	var wg sync.WaitGroup
 	for clusterName, scraper := range c.scrapers {
-		lister, ok := c.listers[clusterName]
-		if !ok {
-			continue
-		}
-
-		brokers, err := lister(ctx)
-		if err != nil {
-			c.logger.Debug("failed to list brokers for metrics", "cluster", clusterName, "error", err)
-			continue
-		}
-
-		var wg sync.WaitGroup
-		for _, b := range brokers {
-			wg.Add(1)
-			go func(broker BrokerInfo) {
-				defer wg.Done()
-				m, err := scraper.Scrape(ctx, broker.Host)
-				if err != nil {
-					c.logger.Debug("failed to scrape broker metrics", "cluster", clusterName, "broker", broker.ID, "error", err)
-					return
-				}
-				key := fmt.Sprintf("%s:%d", clusterName, broker.ID)
-				c.store.Append(key, m)
-			}(b)
-		}
-		wg.Wait()
+		wg.Add(1)
+		go func(name string, s *Scraper) {
+			defer wg.Done()
+			snap, err := s.Scrape(ctx)
+			if err != nil {
+				c.logger.Warn("failed to scrape metrics", "cluster", name, "error", err)
+				return
+			}
+			c.store.Append(name, snap)
+		}(clusterName, scraper)
 	}
+	wg.Wait()
 }

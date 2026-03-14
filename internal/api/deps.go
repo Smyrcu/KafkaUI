@@ -2,6 +2,7 @@ package api
 
 import (
 	"log/slog"
+	"net/http"
 
 	"github.com/Smyrcu/KafkaUI/internal/auth"
 	"github.com/Smyrcu/KafkaUI/internal/config"
@@ -23,8 +24,8 @@ type RouterDeps struct {
 	BasicAuth          *auth.BasicAuthenticator
 	RateLimiter        *auth.LoginRateLimiter
 	AuthTypes          []string
-	MetricsScrapers    map[string]*metrics.Scraper
 	MetricsStore       *metrics.Store
+	MockMetrics        http.Handler
 	DynamicCfg         *config.DynamicConfig
 	StaticClusterNames []string
 }

@@ -1,6 +1,9 @@
 .PHONY: dev dev-env dev-env-down dev-backend dev-frontend build build-frontend build-backend test test-backend test-frontend docker clean
 
 # Development
+# NOTE: dev-env uses podman/docker run — no JMX metrics support (port 9404).
+# For full metrics/JMX, use docker compose instead:
+#   docker compose -f docker-compose.dev.yaml up -d && ./scripts/seed-dev.sh
 dev-env:
 	./scripts/start-dev-env.sh
 

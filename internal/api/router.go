@@ -37,7 +37,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	aclHandler := handlers.NewACLHandler(deps.Registry)
 	userHandler := handlers.NewUserHandler(deps.Registry)
 	dashboardHandler := handlers.NewDashboardHandler(deps.Registry)
-	metricsHandler := handlers.NewMetricsHandler(deps.Registry, deps.MetricsScrapers, deps.MetricsStore)
+	metricsHandler := handlers.NewMetricsHandler(deps.MetricsStore)
 	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger)
 
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
@@ -49,6 +49,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Get("/healthz", healthHandler.Liveness)
 	r.Get("/readyz", healthHandler.Readiness)
 	r.Get("/readyz/{service}", healthHandler.ServiceCheck)
+
+	// Debug endpoints (dev only)
+	if deps.MockMetrics != nil {
+		r.Get("/debug/mock-metrics", deps.MockMetrics.ServeHTTP)
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/docs", handlers.SwaggerUI)
