@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import * as chrono from "chrono-node/en";
+import * as chrono from "chrono-node";
 import { api } from "@/lib/api";
 import type { MetricGroup, MetricDetail, MetricHistoryPoint } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
