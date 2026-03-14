@@ -192,7 +192,7 @@ function GenericChart({ history, range_, name }: { history: MetricHistoryPoint[]
         <XAxis dataKey="time" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
         <YAxis tick={{ fontSize: 11 }} width={65} tickFormatter={(v) => formatCompactNumber(v)} />
         <Tooltip
-          formatter={(value: number) => [formatMetricValue(value, name), name]}
+          formatter={(value: number | undefined) => [formatMetricValue(value ?? 0, name), name]}
           contentStyle={{
             fontSize: 12,
             backgroundColor: "hsl(var(--card))",
