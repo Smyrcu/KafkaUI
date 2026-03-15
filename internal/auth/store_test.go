@@ -2,6 +2,8 @@ package auth
 
 import (
 	"testing"
+
+	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
 func newTestStore(t *testing.T) *UserStore {
@@ -185,5 +187,50 @@ func TestUserStore_DeleteUser(t *testing.T) {
 	}
 	if len(roles) != 0 {
 		t.Errorf("expected 0 roles after user delete, got %d", len(roles))
+	}
+}
+
+func TestResolveRoles_AdminOverrideTakesPrecedence(t *testing.T) {
+	store, _ := NewUserStore(":memory:")
+	defer store.Close()
+
+	user, _, _ := store.UpsertUser(&UserIdentity{ProviderName: "github", ExternalID: "1", Email: "a@co.com", Name: "A"})
+	store.AssignRole(user.ID, "admin")
+
+	rules := []config.AutoAssignmentRule{
+		{Role: "viewer", Match: config.AutoAssignmentMatch{Authenticated: true}},
+	}
+
+	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "a@co.com"}, rules, "viewer")
+	if len(roles) != 1 || roles[0] != "admin" {
+		t.Errorf("expected [admin] override, got %v", roles)
+	}
+}
+
+func TestResolveRoles_FallsBackToAutoAssign(t *testing.T) {
+	store, _ := NewUserStore(":memory:")
+	defer store.Close()
+
+	user, _, _ := store.UpsertUser(&UserIdentity{ProviderName: "github", ExternalID: "2", Email: "b@company.com", Name: "B"})
+
+	rules := []config.AutoAssignmentRule{
+		{Role: "operator", Match: config.AutoAssignmentMatch{EmailDomains: []string{"@company.com"}}},
+	}
+
+	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "b@company.com"}, rules, "viewer")
+	if len(roles) != 1 || roles[0] != "operator" {
+		t.Errorf("expected [operator] via auto-assign, got %v", roles)
+	}
+}
+
+func TestResolveRoles_FallsBackToDefault(t *testing.T) {
+	store, _ := NewUserStore(":memory:")
+	defer store.Close()
+
+	user, _, _ := store.UpsertUser(&UserIdentity{ProviderName: "google", ExternalID: "3", Email: "c@other.com", Name: "C"})
+
+	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "c@other.com"}, nil, "viewer")
+	if len(roles) != 1 || roles[0] != "viewer" {
+		t.Errorf("expected [viewer] default, got %v", roles)
 	}
 }
