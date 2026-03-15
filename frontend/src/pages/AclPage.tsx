@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { useHasAction } from "@/hooks/usePermissions";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,8 @@ const initialForm = {
 export function AclPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
+  const canCreateAcls = useHasAction("create_acls");
+  const canDeleteAcls = useHasAction("delete_acls");
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ACLEntry | null>(null);
@@ -129,7 +132,7 @@ export function AclPage() {
         title="ACL Management"
         description={`Access control lists for ${clusterName}`}
         breadcrumbs={breadcrumbs}
-        actions={
+        actions={canCreateAcls ? (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Create ACL</Button>
@@ -226,7 +229,7 @@ export function AclPage() {
               </div>
             </DialogContent>
           </Dialog>
-        }
+        ) : undefined}
       />
       <div className="mb-4">
         <Input
@@ -237,7 +240,7 @@ export function AclPage() {
         />
       </div>
       {filteredAcls.length === 0 ? (
-        <EmptyState icon={Shield} title="No ACLs found" description={search ? "No ACLs match your search." : "No access control lists configured yet."} actionLabel={!search ? "Create ACL" : undefined} onAction={!search ? () => setDialogOpen(true) : undefined} />
+        <EmptyState icon={Shield} title="No ACLs found" description={search ? "No ACLs match your search." : "No access control lists configured yet."} actionLabel={!search && canCreateAcls ? "Create ACL" : undefined} onAction={!search && canCreateAcls ? () => setDialogOpen(true) : undefined} />
       ) : (
         <DataTable<ACLEntry>
           itemName="ACL entries"
@@ -264,11 +267,11 @@ export function AclPage() {
             },
             {
               header: "Actions",
-              cell: (acl) => (
+              cell: (acl) => canDeleteAcls ? (
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(acl)} disabled={deleteMutation.isPending}>
                   Delete
                 </Button>
-              ),
+              ) : null,
             },
           ]}
         />

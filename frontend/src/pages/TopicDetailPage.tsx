@@ -1,21 +1,39 @@
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { TopicTabs } from "@/components/TopicTabs";
 import { PageHeader } from "@/components/PageHeader";
 import { DetailSkeleton } from "@/components/PageSkeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Trash2 } from "lucide-react";
 import { rowClassName } from "@/lib/utils";
 
 export function TopicDetailPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const canDeleteTopics = useHasAction("delete_topics");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   const { data: topic, isLoading, error, refetch } = useQuery({
     queryKey: ["topic", clusterName, topicName],
     queryFn: () => api.topics.details(clusterName!, topicName!),
     enabled: !!clusterName && !!topicName,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.topics.delete(clusterName!, topicName!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["topics", clusterName] });
+      navigate(`/clusters/${clusterName}/topics`);
+    },
   });
 
   const breadcrumbs = [
@@ -34,7 +52,17 @@ export function TopicDetailPage() {
       <PageHeader
         title={topic.name}
         breadcrumbs={breadcrumbs}
-        actions={topic.internal ? <Badge variant="secondary">internal</Badge> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {topic.internal && <Badge variant="secondary">internal</Badge>}
+            {canDeleteTopics && !topic.internal && (
+              <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleteMutation.isPending ? "Deleting..." : "Delete Topic"}
+              </Button>
+            )}
+          </div>
+        }
       />
       <TopicTabs />
       <div className="grid gap-4 md:grid-cols-2">
@@ -77,6 +105,14 @@ export function TopicDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Topic"
+        description={`Are you sure you want to delete topic "${topicName}"? This action cannot be undone.`}
+        onConfirm={() => deleteMutation.mutate()}
+        destructive
+      />
     </div>
   );
 }

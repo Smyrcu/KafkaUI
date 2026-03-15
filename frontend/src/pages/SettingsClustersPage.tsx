@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type AddClusterRequest, type AdminClusterInfo } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import { PageHeader } from "@/components/PageHeader";
 import { ErrorAlert } from "@/components/ErrorAlert";
 import { EmptyState } from "@/components/EmptyState";
@@ -22,6 +23,7 @@ const emptyForm: AddClusterRequest = {
 
 export function SettingsClustersPage() {
   const queryClient = useQueryClient();
+  const canManageClusters = useHasAction("manage_clusters");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editName, setEditName] = useState<string | null>(null);
   const [form, setForm] = useState<AddClusterRequest>(emptyForm);
@@ -98,6 +100,12 @@ export function SettingsClustersPage() {
     ...(data?.static.map((c) => ({ ...c, source: "static" as const })) || []),
     ...(data?.dynamic.map((c) => ({ ...c, source: "dynamic" as const })) || []),
   ];
+
+  if (!canManageClusters) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">Access denied.</div>
+    );
+  }
 
   return (
     <div>

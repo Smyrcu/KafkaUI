@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
+import { useHasAction } from "@/hooks/usePermissions";
 import { api } from "@/lib/api";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ export function ConnectorDetailPage() {
   const { clusterName, connectorName } = useParams<{ clusterName: string; connectorName: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const canManageConnectors = useHasAction("manage_connectors");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [configJson, setConfigJson] = useState("");
@@ -103,21 +105,25 @@ export function ConnectorDetailPage() {
           <div className="flex items-center gap-2">
             <Badge variant={getConnectorStateBadgeVariant(connector.state)}>{connector.state.toUpperCase()}</Badge>
             <Badge variant="secondary">{connector.type}</Badge>
-            <Button variant="outline" size="sm" onClick={() => restartMutation.mutate()} disabled={restartMutation.isPending}>
-              {restartMutation.isPending ? "Restarting..." : "Restart"}
-            </Button>
-            {isPaused ? (
-              <Button variant="outline" size="sm" onClick={() => resumeMutation.mutate()} disabled={resumeMutation.isPending}>
-                {resumeMutation.isPending ? "Resuming..." : "Resume"}
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => pauseMutation.mutate()} disabled={pauseMutation.isPending}>
-                {pauseMutation.isPending ? "Pausing..." : "Pause"}
-              </Button>
+            {canManageConnectors && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => restartMutation.mutate()} disabled={restartMutation.isPending}>
+                  {restartMutation.isPending ? "Restarting..." : "Restart"}
+                </Button>
+                {isPaused ? (
+                  <Button variant="outline" size="sm" onClick={() => resumeMutation.mutate()} disabled={resumeMutation.isPending}>
+                    {resumeMutation.isPending ? "Resuming..." : "Resume"}
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => pauseMutation.mutate()} disabled={pauseMutation.isPending}>
+                    {pauseMutation.isPending ? "Pausing..." : "Pause"}
+                  </Button>
+                )}
+                <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
+                  {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                </Button>
+              </>
             )}
-            <Button variant="destructive" size="sm" onClick={() => setDeleteConfirmOpen(true)} disabled={deleteMutation.isPending}>
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
-            </Button>
           </div>
         }
       />
@@ -171,6 +177,7 @@ export function ConnectorDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Configuration</CardTitle>
+            {canManageConnectors && (
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={openEditDialog}>
@@ -203,6 +210,7 @@ export function ConnectorDetailPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent>

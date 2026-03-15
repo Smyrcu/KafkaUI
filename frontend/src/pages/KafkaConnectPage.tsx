@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ErrorAlert } from "@/components/ErrorAlert";
@@ -23,6 +24,7 @@ import { getConnectorStateBadgeVariant } from "@/lib/helpers";
 export function KafkaConnectPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
+  const canManageConnectors = useHasAction("manage_connectors");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const connectorAccessor = useCallback((c: ConnectorInfo) => c.name, []);
@@ -101,7 +103,7 @@ export function KafkaConnectPage() {
         title="Kafka Connect"
         description={`Manage connectors in ${clusterName}`}
         breadcrumbs={breadcrumbs}
-        actions={
+        actions={canManageConnectors ? (
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Create Connector</Button>
@@ -147,7 +149,7 @@ export function KafkaConnectPage() {
               </form>
             </DialogContent>
           </Dialog>
-        }
+        ) : undefined}
       />
       <div className="mb-4">
         <Input
@@ -158,7 +160,7 @@ export function KafkaConnectPage() {
         />
       </div>
       {filteredConnectors.length === 0 ? (
-        <EmptyState icon={PlugZap} title="No connectors found" description={search ? "No connectors match your search." : "No connectors deployed yet."} actionLabel={!search ? "Create Connector" : undefined} onAction={!search ? () => setCreateOpen(true) : undefined} />
+        <EmptyState icon={PlugZap} title="No connectors found" description={search ? "No connectors match your search." : "No connectors deployed yet."} actionLabel={!search && canManageConnectors ? "Create Connector" : undefined} onAction={!search && canManageConnectors ? () => setCreateOpen(true) : undefined} />
       ) : (
         <DataTable<ConnectorInfo>
           itemName="connectors"
@@ -184,7 +186,7 @@ export function KafkaConnectPage() {
             { header: "Connect Cluster", accessorKey: "connectCluster" },
             {
               header: "Actions",
-              cell: (c) => (
+              cell: (c) => canManageConnectors ? (
                 <div className="flex items-center gap-1">
                   <Button variant="outline" size="sm" disabled={restartMutation.isPending} onClick={(e) => { e.stopPropagation(); restartMutation.mutate(c.name); }}>
                     Restart
@@ -202,7 +204,7 @@ export function KafkaConnectPage() {
                     Delete
                   </Button>
                 </div>
-              ),
+              ) : null,
             },
           ]}
         />
