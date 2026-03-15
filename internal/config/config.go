@@ -31,9 +31,11 @@ type MaskingField struct {
 }
 
 type ServerConfig struct {
-	Port     int    `yaml:"port"`
-	BasePath string `yaml:"base-path"`
-	Debug    bool   `yaml:"debug"`
+	Port        int      `yaml:"port"`
+	BasePath    string   `yaml:"base-path"`
+	Debug       bool     `yaml:"debug"`
+	TrustProxy  bool     `yaml:"trust-proxy"`
+	CORSOrigins []string `yaml:"cors-origins"`
 }
 
 type AuthConfig struct {
@@ -95,6 +97,9 @@ type OAuth2Provider struct {
 	ClientID     string   `yaml:"client-id"`
 	ClientSecret string   `yaml:"client-secret"`
 	Scopes       []string `yaml:"scopes"`
+	AuthURL      string   `yaml:"auth-url"`
+	TokenURL     string   `yaml:"token-url"`
+	APIURL       string   `yaml:"api-url"`
 }
 
 type RBACConfig struct {

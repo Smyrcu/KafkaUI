@@ -18,8 +18,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 	r.Use(middleware.Logger(deps.Logger))
+	corsOrigins := []string{"*"}
+	if len(deps.CORSOrigins) > 0 {
+		corsOrigins = deps.CORSOrigins
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   corsOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		MaxAge:           300,
@@ -57,6 +61,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		Logger:       deps.Logger,
 		Enabled:      deps.AuthEnabled,
 		AuthTypes:    deps.AuthTypes,
+		TrustProxy:   deps.TrustProxy,
 	})
 
 	// Health probes — top-level, no auth

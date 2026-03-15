@@ -1,6 +1,10 @@
 server:
   port: 8080
   base-path: ""
+  # trust-proxy: false    # set to true when running behind a reverse proxy (nginx, Traefik, etc.)
+  #                       # enables X-Forwarded-For parsing for rate-limiter IP detection
+  # cors-origins: []      # allowed CORS origins; defaults to ["*"] when empty
+  #                       # example: ["https://kafkaui.example.com"]
 
 auth:
   enabled: false
@@ -102,6 +106,11 @@ auth:
 #         client-id: "${GITHUB_CLIENT_ID}"
 #         client-secret: "${GITHUB_CLIENT_SECRET}"
 #         scopes: [read:org]            # read:org required for org/team membership checks
+#         # auth-url, token-url, api-url are optional — defaults to github.com URLs
+#         # Specify them to use a generic OAuth2 provider (e.g. Gitea, Forgejo, self-hosted):
+#         # auth-url:  "https://git.example.com/login/oauth/authorize"
+#         # token-url: "https://git.example.com/login/oauth/access_token"
+#         # api-url:   "https://git.example.com/api/v1"
 #   session:
 #     secret: "${SESSION_SECRET}"
 #     max-age: 86400

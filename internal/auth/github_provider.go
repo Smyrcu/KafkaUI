@@ -45,6 +45,19 @@ func NewGitHubProvider(cfg config.OAuth2Provider, redirectURL string, apiBaseOve
 	tokenURL := githubTokenURL
 	authorizeURL := githubAuthorizeURL
 
+	// Config-level URL overrides take precedence (make the provider usable with
+	// any OAuth2 server that follows the standard flow, not just GitHub).
+	if cfg.AuthURL != "" {
+		authorizeURL = cfg.AuthURL
+	}
+	if cfg.TokenURL != "" {
+		tokenURL = cfg.TokenURL
+	}
+	if cfg.APIURL != "" {
+		apiBase = cfg.APIURL
+	}
+
+	// Test-only: apiBaseOverride wires all three endpoints to a local server.
 	if apiBaseOverride != "" {
 		apiBase = apiBaseOverride + "/api/v3"
 		tokenURL = apiBaseOverride + "/login/oauth/access_token"

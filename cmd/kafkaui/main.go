@@ -279,6 +279,8 @@ func main() {
 		RBAC:               rbac,
 		AutoAssignment:     cfg.Auth.AutoAssignment,
 		DefaultRole:        cfg.Auth.DefaultRole,
+		TrustProxy:         cfg.Server.TrustProxy,
+		CORSOrigins:        cfg.Server.CORSOrigins,
 	})
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")

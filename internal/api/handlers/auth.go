@@ -31,6 +31,7 @@ type AuthHandlerDeps struct {
 	Logger       *slog.Logger
 	Enabled      bool
 	AuthTypes    []string
+	TrustProxy   bool
 }
 
 type AuthHandler struct {
@@ -46,6 +47,7 @@ type AuthHandler struct {
 	logger       *slog.Logger
 	enabled      bool
 	authTypes    []string
+	trustProxy   bool
 }
 
 func NewAuthHandler(deps AuthHandlerDeps) *AuthHandler {
@@ -62,6 +64,7 @@ func NewAuthHandler(deps AuthHandlerDeps) *AuthHandler {
 		logger:       deps.Logger,
 		enabled:      deps.Enabled,
 		authTypes:    deps.AuthTypes,
+		trustProxy:   deps.TrustProxy,
 	}
 }
 
@@ -81,9 +84,11 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		parts := strings.Split(fwd, ",")
-		ip = strings.TrimSpace(parts[len(parts)-1])
+	if h.trustProxy {
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			parts := strings.Split(fwd, ",")
+			ip = strings.TrimSpace(parts[0])
+		}
 	}
 	if !h.rateLimiter.Allow(ip) {
 		h.logger.Warn("login rate limited", "ip", ip)

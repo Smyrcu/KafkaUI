@@ -32,4 +32,6 @@ type RouterDeps struct {
 	RBAC               *auth.RBAC
 	AutoAssignment     []config.AutoAssignmentRule
 	DefaultRole        string
+	TrustProxy         bool
+	CORSOrigins        []string
 }
