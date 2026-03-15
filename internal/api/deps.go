@@ -19,7 +19,7 @@ type RouterDeps struct {
 	Sessions           *auth.SessionManager
 	AuthEnabled        bool
 	MaskingEngine      *masking.Engine
-	OIDCProviders      map[string]*auth.Provider
+	OIDCProviders      map[string]*auth.OIDCProvider
 	OIDCProviderCfg    []config.OIDCProvider
 	BasicAuth          *auth.BasicAuthenticator
 	RateLimiter        *auth.LoginRateLimiter

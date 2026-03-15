@@ -90,13 +90,13 @@ func mergeDynamicClusters(cfg *config.Config, dynamicCfg *config.DynamicConfig, 
 }
 
 // initOIDCProviders creates OIDC providers when auth types include "oidc".
-func initOIDCProviders(cfg *config.Config, logger *slog.Logger) (map[string]*auth.Provider, []config.OIDCProvider) {
+func initOIDCProviders(cfg *config.Config, logger *slog.Logger) (map[string]*auth.OIDCProvider, []config.OIDCProvider) {
 	if !cfg.Auth.Enabled || !slices.Contains(cfg.Auth.Types, "oidc") {
 		return nil, nil
 	}
-	providers := make(map[string]*auth.Provider)
+	providers := make(map[string]*auth.OIDCProvider)
 	for _, p := range cfg.Auth.OIDC.Providers {
-		provider, err := auth.NewProvider(context.Background(), p, cfg.Auth.OIDC.RedirectURL)
+		provider, err := auth.NewOIDCProvider(context.Background(), p, cfg.Auth.OIDC.RedirectURL)
 		if err != nil {
 			logger.Error("failed to create OIDC provider", "name", p.Name, "error", err)
 			os.Exit(1)

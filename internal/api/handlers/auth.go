@@ -16,7 +16,7 @@ import (
 )
 
 type AuthHandler struct {
-	providers   map[string]*auth.Provider
+	providers   map[string]*auth.OIDCProvider
 	providerCfg []config.OIDCProvider
 	basic       *auth.BasicAuthenticator
 	rateLimiter *auth.LoginRateLimiter
@@ -26,7 +26,7 @@ type AuthHandler struct {
 	authTypes   []string
 }
 
-func NewAuthHandler(providers map[string]*auth.Provider, providerCfg []config.OIDCProvider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
+func NewAuthHandler(providers map[string]*auth.OIDCProvider, providerCfg []config.OIDCProvider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
 	return &AuthHandler{
 		providers:   providers,
 		providerCfg: providerCfg,
@@ -169,17 +169,16 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	userInfo, rawToken, err := provider.Exchange(r.Context(), code)
+	identity, err := provider.Exchange(r.Context(), code)
 	if err != nil {
 		writeInternalError(w, "exchanging OIDC code", err)
 		return
 	}
 
 	if err := h.sessions.CreateSession(w, r, auth.SessionData{
-		Token: rawToken,
-		Email: userInfo.Email,
-		Name:  userInfo.Name,
-		Roles: userInfo.Roles,
+		Email: identity.Email,
+		Name:  identity.Name,
+		Roles: identity.Orgs,
 	}); err != nil {
 		writeInternalError(w, "creating OIDC session", err)
 		return
