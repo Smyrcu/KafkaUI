@@ -243,6 +243,27 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface AdminUser {
+  id: string;
+  providerName: string;
+  externalId: string;
+  email: string;
+  name: string;
+  avatarUrl: string;
+  roles: string[];
+  lastLogin: string;
+  createdAt: string;
+}
+
+export interface PermissionsResponse {
+  actions: string[];
+  clusters: string[];
+}
+
+export interface SetRolesRequest {
+  roles: string[];
+}
+
 export interface AdminClusterInfo {
   name: string;
   bootstrapServers: string;
@@ -350,6 +371,7 @@ export const api = {
     me: () => request<AuthUser>('/auth/me'),
     login: (data: LoginRequest) => request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
     logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+    permissions: () => request<PermissionsResponse>('/auth/permissions'),
   },
   admin: {
     listClusters: () => request<AdminClusterList>('/admin/clusters'),
@@ -361,5 +383,11 @@ export const api = {
       request<{ status: string }>(`/admin/clusters/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     testConnection: (data: AddClusterRequest) =>
       request<TestConnectionResult>('/admin/clusters/test', { method: 'POST', body: JSON.stringify(data) }),
+    listUsers: () => request<AdminUser[]>('/admin/users'),
+    getUser: (id: string) => request<AdminUser>(`/admin/users/${id}`),
+    setUserRoles: (id: string, data: SetRolesRequest) =>
+      request<{ status: string }>(`/admin/users/${id}/roles`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteUser: (id: string) =>
+      request<{ status: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
   },
 };
