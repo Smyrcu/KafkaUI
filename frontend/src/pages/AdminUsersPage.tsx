@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
 import { getErrorMessage } from "@/lib/error-utils";
 import { Users, Trash2, Shield } from "lucide-react";
+import { useHasAction } from "@/hooks/usePermissions";
 
 const COMMON_ROLES = ["admin", "operator", "viewer"] as const;
 
@@ -146,6 +147,7 @@ function EditRolesDialog({ user, onClose }: EditRolesDialogProps) {
 }
 
 export function AdminUsersPage() {
+  const canManageUsers = useHasAction("manage_users");
   const queryClient = useQueryClient();
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
@@ -167,6 +169,15 @@ export function AdminUsersPage() {
     { label: "Dashboard", href: "/" },
     { label: "Settings" },
   ];
+
+  if (!canManageUsers) {
+    return (
+      <div>
+        <PageHeader title="Admin Users" breadcrumbs={breadcrumbs} />
+        <p className="p-4 text-sm text-muted-foreground">Access denied.</p>
+      </div>
+    );
+  }
 
   if (isLoading) return <><PageHeader title="Admin Users" breadcrumbs={breadcrumbs} /><TableSkeleton cols={5} /></>;
   if (error) {

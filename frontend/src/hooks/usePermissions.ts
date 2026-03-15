@@ -13,7 +13,14 @@ export function usePermissions() {
 }
 
 export function useHasAction(action: string): boolean {
-  const { data } = usePermissions();
-  if (!data) return true; // permissive when loading or auth disabled
+  const { status } = useAuth();
+  const { data, isLoading } = usePermissions();
+
+  // If auth is not enabled, all actions are allowed
+  if (!status?.enabled) return true;
+
+  // Deny during loading to prevent flash of authorized content
+  if (isLoading || !data) return false;
+
   return data.actions.includes(action) || data.actions.includes("*");
 }
