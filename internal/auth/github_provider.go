@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"golang.org/x/oauth2"
 
@@ -24,13 +27,15 @@ type GitHubProvider struct {
 	name         string
 	oauth2Config oauth2.Config
 	apiBase      string
+	logger       *slog.Logger
 }
 
 // NewGitHubProvider creates a GitHubProvider from the given OAuth2 provider
 // config and redirect URL. When apiBaseOverride is non-empty it is used as the
 // base URL for both the OAuth2 endpoints and the REST API (useful in tests
-// against a local httptest server).
-func NewGitHubProvider(cfg config.OAuth2Provider, redirectURL string, apiBaseOverride string) *GitHubProvider {
+// against a local httptest server). logger may be nil; a discard logger is
+// used in that case.
+func NewGitHubProvider(cfg config.OAuth2Provider, redirectURL string, apiBaseOverride string, logger *slog.Logger) *GitHubProvider {
 	scopes := cfg.Scopes
 	if len(scopes) == 0 {
 		scopes = []string{"user:email", "read:org"}
@@ -46,6 +51,10 @@ func NewGitHubProvider(cfg config.OAuth2Provider, redirectURL string, apiBaseOve
 		authorizeURL = apiBaseOverride + "/login/oauth/authorize"
 	}
 
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &GitHubProvider{
 		name: cfg.Name,
 		oauth2Config: oauth2.Config{
@@ -59,6 +68,7 @@ func NewGitHubProvider(cfg config.OAuth2Provider, redirectURL string, apiBaseOve
 			},
 		},
 		apiBase: apiBase,
+		logger:  logger,
 	}
 }
 
@@ -86,7 +96,13 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code, _ string) (*UserIde
 		return nil, fmt.Errorf("exchanging GitHub auth code: %w", err)
 	}
 
-	client := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+	// Wrap the oauth2 transport with an explicit timeout so GitHub API calls
+	// cannot stall indefinitely even when the context has no deadline.
+	baseClient := oauth2.NewClient(ctx, oauth2.StaticTokenSource(token))
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: baseClient.Transport,
+	}
 
 	user, err := p.fetchUser(client)
 	if err != nil {
@@ -98,8 +114,14 @@ func (p *GitHubProvider) Exchange(ctx context.Context, code, _ string) (*UserIde
 		return nil, err
 	}
 
-	orgs, _ := p.fetchOrgs(client)   // non-fatal
-	teams, _ := p.fetchTeams(client) // non-fatal
+	orgs, err := p.fetchOrgs(client)
+	if err != nil {
+		p.logger.Warn("could not fetch GitHub org memberships; continuing without orgs", "error", err)
+	}
+	teams, err := p.fetchTeams(client)
+	if err != nil {
+		p.logger.Warn("could not fetch GitHub team memberships; continuing without teams", "error", err)
+	}
 
 	return &UserIdentity{
 		ProviderName: p.name,
@@ -155,7 +177,7 @@ func (p *GitHubProvider) fetchOrgs(client *http.Client) ([]string, error) {
 		Login string `json:"login"`
 	}
 	if err := p.getJSON(client, "/user/orgs", &orgs); err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("fetching GitHub orgs: %w", err)
 	}
 	result := make([]string, len(orgs))
 	for i, o := range orgs {
@@ -172,7 +194,7 @@ func (p *GitHubProvider) fetchTeams(client *http.Client) ([]string, error) {
 		} `json:"organization"`
 	}
 	if err := p.getJSON(client, "/user/teams", &teams); err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("fetching GitHub teams: %w", err)
 	}
 	result := make([]string, len(teams))
 	for i, t := range teams {
@@ -190,5 +212,5 @@ func (p *GitHubProvider) getJSON(client *http.Client, path string, dest any) err
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GitHub API %s returned %d", path, resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(dest)
+	return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(dest)
 }

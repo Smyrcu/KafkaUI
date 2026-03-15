@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -97,6 +98,17 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, expectedNonce string)
 }
 
 // extractIdentity parses the ID token claims into a UserIdentity struct. It
+// delegates claim parsing to parseIdentityClaims so that the logic can be
+// tested independently without constructing a real oidc.IDToken.
+func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity, error) {
+	var raw json.RawMessage
+	if err := idToken.Claims(&raw); err != nil {
+		return nil, fmt.Errorf("extracting claims from ID token: %w", err)
+	}
+	return parseIdentityClaims(raw, providerName)
+}
+
+// parseIdentityClaims parses raw OIDC claims JSON into a UserIdentity. It
 // checks multiple common claim keys for group membership since different OIDC
 // providers use different conventions (e.g., Keycloak uses realm_access.roles
 // to represent group membership, others use a top-level groups claim).
@@ -106,21 +118,21 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, expectedNonce string)
 //   - realm_access.roles → Orgs (Keycloak group-style membership)
 //   - roles              → ignored; top-level roles are managed via UserStore,
 //     not derived from token claims.
-func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity, error) {
+func parseIdentityClaims(claimsJSON []byte, providerName string) (*UserIdentity, error) {
 	var claims struct {
-		Subject       string `json:"sub"`
-		Email         string `json:"email"`
-		EmailVerified *bool  `json:"email_verified"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
+		Subject       string   `json:"sub"`
+		Email         string   `json:"email"`
+		EmailVerified *bool    `json:"email_verified"`
+		Name          string   `json:"name"`
+		Picture       string   `json:"picture"`
 		Groups        []string `json:"groups"`
 		RealmAccess   struct {
 			Roles []string `json:"roles"`
 		} `json:"realm_access"`
 	}
 
-	if err := idToken.Claims(&claims); err != nil {
-		return nil, fmt.Errorf("extracting claims from ID token: %w", err)
+	if err := json.Unmarshal(claimsJSON, &claims); err != nil {
+		return nil, fmt.Errorf("parsing identity claims: %w", err)
 	}
 
 	// Only trust an email that is explicitly verified. If the claim is present

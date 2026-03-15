@@ -120,7 +120,7 @@ func initProviders(cfg *config.Config, logger *slog.Logger) (map[string]auth.Ide
 	// OAuth2 providers (GitHub, etc.)
 	if slices.Contains(cfg.Auth.Types, "oauth2") {
 		for _, p := range cfg.Auth.OAuth2.Providers {
-			provider := auth.NewGitHubProvider(p, cfg.Auth.OAuth2.RedirectURL, "")
+			provider := auth.NewGitHubProvider(p, cfg.Auth.OAuth2.RedirectURL, "", logger)
 			providers[p.Name] = provider
 			providerList = append(providerList, auth.ProviderInfo{
 				Name:        p.Name,

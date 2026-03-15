@@ -42,7 +42,8 @@ func NewSessionManager(secret string, maxAge int) *SessionManager {
 }
 
 // CreateSession encodes the SessionData as JSON, signs it with HMAC-SHA256, and sets it as
-// an HTTP-only cookie. The cookie is Secure when the request origin is not localhost.
+// an HTTP-only cookie. The cookie is Secure when the request arrives over HTTPS (direct TLS
+// or X-Forwarded-Proto: https); it is not Secure on localhost so local development works.
 func (sm *SessionManager) CreateSession(w http.ResponseWriter, r *http.Request, data SessionData) error {
 	data.CreatedAt = time.Now().Unix()
 	jsonData, err := json.Marshal(data)
@@ -52,7 +53,7 @@ func (sm *SessionManager) CreateSession(w http.ResponseWriter, r *http.Request, 
 
 	signed := sm.sign(jsonData)
 
-	secure := !isLocalhost(r)
+	secure := IsSecureRequest(r)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
@@ -95,7 +96,7 @@ func (sm *SessionManager) GetSession(r *http.Request) (*SessionData, error) {
 
 // ClearSession removes the session by setting an expired cookie.
 func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) {
-	secure := !isLocalhost(r)
+	secure := IsSecureRequest(r)
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
@@ -147,6 +148,17 @@ func (sm *SessionManager) verify(signed []byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// IsSecureRequest returns true when the request arrives over HTTPS — either
+// because the connection itself is TLS, or because a trusted proxy has set
+// X-Forwarded-Proto: https. Localhost origins are treated as non-secure so
+// that local development works without TLS certificates.
+func IsSecureRequest(r *http.Request) bool {
+	if isLocalhost(r) {
+		return false
+	}
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 // isLocalhost returns true if the request originates from a localhost address.

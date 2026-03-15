@@ -76,7 +76,7 @@ func TestGitHubProvider_Exchange(t *testing.T) {
 		ClientSecret: "client-secret",
 	}
 
-	provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL)
+	provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL, nil)
 
 	identity, err := provider.Exchange(context.Background(), "dummy-code", "")
 	if err != nil {
@@ -152,7 +152,7 @@ func TestGitHubProvider_UnverifiedEmailRejected(t *testing.T) {
 		})
 		defer srv.Close()
 
-		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL)
+		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL, nil)
 		_, err := provider.Exchange(context.Background(), "code", "")
 		if err == nil {
 			t.Error("expected error for unverified primary email, got nil")
@@ -167,7 +167,7 @@ func TestGitHubProvider_UnverifiedEmailRejected(t *testing.T) {
 		})
 		defer srv.Close()
 
-		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL)
+		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL, nil)
 		_, err := provider.Exchange(context.Background(), "code", "")
 		if err == nil {
 			t.Error("expected error when no verified primary email, got nil")
@@ -180,7 +180,7 @@ func TestGitHubProvider_UnverifiedEmailRejected(t *testing.T) {
 		})
 		defer srv.Close()
 
-		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL)
+		provider := NewGitHubProvider(cfg, "http://localhost/callback", srv.URL, nil)
 		identity, err := provider.Exchange(context.Background(), "code", "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -197,7 +197,7 @@ func TestGitHubProvider_NameAndType(t *testing.T) {
 		ClientID:     "cid",
 		ClientSecret: "csec",
 	}
-	provider := NewGitHubProvider(cfg, "http://localhost/callback", "")
+	provider := NewGitHubProvider(cfg, "http://localhost/callback", "", nil)
 
 	if got := provider.Name(); got != "github" {
 		t.Errorf("Name() = %q, want %q", got, "github")

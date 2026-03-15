@@ -166,7 +166,7 @@ func (h *AuthHandler) LoginProvider(w http.ResponseWriter, r *http.Request) {
 	state := randomPart + ":" + providerName
 	nonce := generateState()
 
-	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	secure := auth.IsSecureRequest(r)
 	maxAge := int(5 * time.Minute / time.Second)
 
 	http.SetCookie(w, &http.Cookie{
