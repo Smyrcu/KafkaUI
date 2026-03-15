@@ -387,7 +387,7 @@ server:
   port: 8080
 auth:
   enabled: true
-  types: [basic, oidc, oauth2]
+  types: [oauth2]
   default-role: viewer
   oauth2:
     redirect-url: "http://localhost:8080/api/v1/auth/callback"
@@ -452,6 +452,182 @@ clusters:
 	adminRule := cfg.Auth.AutoAssignment[1]
 	if len(adminRule.Match.Emails) != 1 || len(adminRule.Match.GitHubOrgs) != 1 {
 		t.Errorf("expected admin rule match with 1 email + 1 github org")
+	}
+}
+
+func TestValidate_AuthDisabled(t *testing.T) {
+	cfg := &Config{}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("expected no error when auth disabled, got: %v", err)
+	}
+}
+
+func TestValidate_AuthEnabledNoTypes(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{Enabled: true}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when auth.enabled but no types, got nil")
+	}
+}
+
+func TestValidate_UnrecognisedAuthType(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{Enabled: true, Types: []string{"ldap"}}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error for unrecognised auth type, got nil")
+	}
+}
+
+func TestValidate_BasicNoUsers(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{Enabled: true, Types: []string{"basic"}}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when basic type has no users, got nil")
+	}
+}
+
+func TestValidate_BasicWithUsers(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"basic"},
+		Basic:   BasicAuthConfig{Users: []BasicUser{{Username: "admin", Password: "hash"}}},
+	}}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("expected no error for valid basic config, got: %v", err)
+	}
+}
+
+func TestValidate_OIDCMissingRedirectURL(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oidc"},
+		OIDC: OIDCConfig{
+			Providers: []OIDCProvider{{Name: "google", Issuer: "https://accounts.google.com", ClientID: "id"}},
+		},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oidc redirect-url is empty, got nil")
+	}
+}
+
+func TestValidate_OIDCMissingProviders(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oidc"},
+		OIDC:    OIDCConfig{RedirectURL: "http://localhost/callback"},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oidc has no providers, got nil")
+	}
+}
+
+func TestValidate_OIDCProviderMissingIssuer(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oidc"},
+		OIDC: OIDCConfig{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OIDCProvider{{Name: "google", ClientID: "id"}},
+		},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oidc provider has no issuer, got nil")
+	}
+}
+
+func TestValidate_OIDCProviderMissingClientID(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oidc"},
+		OIDC: OIDCConfig{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OIDCProvider{{Name: "google", Issuer: "https://accounts.google.com"}},
+		},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oidc provider has no client-id, got nil")
+	}
+}
+
+func TestValidate_OIDCValid(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oidc"},
+		OIDC: OIDCConfig{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OIDCProvider{{Name: "google", Issuer: "https://accounts.google.com", ClientID: "id"}},
+		},
+	}}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("expected no error for valid oidc config, got: %v", err)
+	}
+}
+
+func TestValidate_OAuth2MissingRedirectURL(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oauth2"},
+		OAuth2: OAuth2Config{
+			Providers: []OAuth2Provider{{Name: "github", ClientID: "id"}},
+		},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oauth2 redirect-url is empty, got nil")
+	}
+}
+
+func TestValidate_OAuth2MissingProviders(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oauth2"},
+		OAuth2:  OAuth2Config{RedirectURL: "http://localhost/callback"},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oauth2 has no providers, got nil")
+	}
+}
+
+func TestValidate_OAuth2ProviderMissingClientID(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oauth2"},
+		OAuth2: OAuth2Config{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OAuth2Provider{{Name: "github"}},
+		},
+	}}
+	if err := cfg.Validate(); err == nil {
+		t.Error("expected error when oauth2 provider has no client-id, got nil")
+	}
+}
+
+func TestValidate_OAuth2Valid(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"oauth2"},
+		OAuth2: OAuth2Config{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id"}},
+		},
+	}}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("expected no error for valid oauth2 config, got: %v", err)
+	}
+}
+
+func TestValidate_MultipleTypesAllValid(t *testing.T) {
+	cfg := &Config{Auth: AuthConfig{
+		Enabled: true,
+		Types:   []string{"basic", "oidc", "oauth2"},
+		Basic:   BasicAuthConfig{Users: []BasicUser{{Username: "admin", Password: "hash"}}},
+		OIDC: OIDCConfig{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OIDCProvider{{Name: "google", Issuer: "https://accounts.google.com", ClientID: "id"}},
+		},
+		OAuth2: OAuth2Config{
+			RedirectURL: "http://localhost/callback",
+			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id"}},
+		},
+	}}
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("expected no error for fully valid multi-type config, got: %v", err)
 	}
 }
 

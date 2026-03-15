@@ -96,7 +96,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			}
 
 			r.With(requireAction("view_dashboard")).Get("/dashboard", dashboardHandler.Overview)
-			r.Get("/clusters", clusterHandler.List)
+			r.With(requireAction("view_dashboard")).Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(middleware.RequireRole("admin", deps.AuthEnabled, deps.UserStore))

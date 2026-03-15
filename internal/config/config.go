@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -186,5 +187,69 @@ func Load(path string) (*Config, error) {
 		cfg.Server.Port = 8080
 	}
 
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	return &cfg, nil
+}
+
+// validAuthTypes is the set of recognised authentication type strings.
+var validAuthTypes = []string{"basic", "oidc", "oauth2"}
+
+// Validate checks that the configuration is semantically consistent.
+// It returns a descriptive error for the first violation found.
+func (c *Config) Validate() error {
+	if !c.Auth.Enabled {
+		return nil
+	}
+
+	if len(c.Auth.Types) == 0 {
+		return fmt.Errorf("auth.enabled is true but auth.types is empty — specify at least one of: basic, oidc, oauth2")
+	}
+
+	for _, t := range c.Auth.Types {
+		if !slices.Contains(validAuthTypes, t) {
+			return fmt.Errorf("auth.types contains unrecognised value %q — valid values are: basic, oidc, oauth2", t)
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "basic") {
+		if len(c.Auth.Basic.Users) == 0 {
+			return fmt.Errorf("auth.types includes \"basic\" but auth.basic.users is empty — add at least one user")
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "oidc") {
+		if c.Auth.OIDC.RedirectURL == "" {
+			return fmt.Errorf("auth.types includes \"oidc\" but auth.oidc.redirect-url is empty")
+		}
+		if len(c.Auth.OIDC.Providers) == 0 {
+			return fmt.Errorf("auth.types includes \"oidc\" but auth.oidc.providers is empty — add at least one provider")
+		}
+		for i, p := range c.Auth.OIDC.Providers {
+			if p.Issuer == "" {
+				return fmt.Errorf("auth.oidc.providers[%d] (%q): issuer must not be empty", i, p.Name)
+			}
+			if p.ClientID == "" {
+				return fmt.Errorf("auth.oidc.providers[%d] (%q): client-id must not be empty", i, p.Name)
+			}
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "oauth2") {
+		if c.Auth.OAuth2.RedirectURL == "" {
+			return fmt.Errorf("auth.types includes \"oauth2\" but auth.oauth2.redirect-url is empty")
+		}
+		if len(c.Auth.OAuth2.Providers) == 0 {
+			return fmt.Errorf("auth.types includes \"oauth2\" but auth.oauth2.providers is empty — add at least one provider")
+		}
+		for i, p := range c.Auth.OAuth2.Providers {
+			if p.ClientID == "" {
+				return fmt.Errorf("auth.oauth2.providers[%d] (%q): client-id must not be empty", i, p.Name)
+			}
+		}
+	}
+
+	return nil
 }

@@ -162,6 +162,21 @@ func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 // GetUser returns the User with the given ID, including their roles.
 // Returns an error if no such user exists.
 func (s *UserStore) GetUser(id string) (*User, error) {
+	u, err := s.GetUserBasic(id)
+	if err != nil {
+		return nil, err
+	}
+	u.Roles, err = s.GetRoles(id)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// GetUserBasic returns the User with the given ID without loading role assignments.
+// Use this when roles will be fetched separately (e.g. via ResolveRoles) to avoid
+// a redundant GetRoles query.
+func (s *UserStore) GetUserBasic(id string) (*User, error) {
 	row := s.db.QueryRow(`
 		SELECT id, provider_name, external_id, email, name, avatar_url, orgs, teams, last_login, created_at
 		FROM users WHERE id = ?`, id)
@@ -169,11 +184,6 @@ func (s *UserStore) GetUser(id string) (*User, error) {
 	u, err := scanUser(row)
 	if err != nil {
 		return nil, fmt.Errorf("get user %s: %w", id, err)
-	}
-
-	u.Roles, err = s.GetRoles(id)
-	if err != nil {
-		return nil, err
 	}
 	return u, nil
 }

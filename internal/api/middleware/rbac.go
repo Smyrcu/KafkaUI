@@ -41,8 +41,9 @@ func RequireAction(deps RBACDeps, action string, authEnabled bool) func(http.Han
 				cluster = "*"
 			}
 
-			// Use ResolveRoles to get effective roles
-			user, err := deps.Store.GetUser(session.UserID)
+			// Use GetUserBasic to avoid a redundant GetRoles query — ResolveRoles
+			// will call GetRoles itself when checking for admin overrides.
+			user, err := deps.Store.GetUserBasic(session.UserID)
 			if err != nil {
 				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 				return
