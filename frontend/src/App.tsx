@@ -20,6 +20,7 @@ import { KsqlPage } from "@/pages/KsqlPage";
 import { AclPage } from "@/pages/AclPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { SettingsClustersPage } from "@/pages/SettingsClustersPage";
+import { AdminUsersPage } from "@/pages/AdminUsersPage";
 import { lazy, Suspense, type ReactNode } from "react";
 
 const MetricsPage = lazy(() => import("./pages/MetricsPage").then(m => ({ default: m.MetricsPage })));
@@ -72,6 +73,7 @@ export default function App() {
                   <Route path="/clusters/:clusterName/users" element={<UsersPage />} />
                   <Route path="/clusters/:clusterName/metrics" element={<Suspense fallback={null}><MetricsPage /></Suspense>} />
                   <Route path="/settings/clusters" element={<SettingsClustersPage />} />
+                  <Route path="/settings/users" element={<AdminUsersPage />} />
                 </Route>
               </Routes>
             </RequireAuth>
