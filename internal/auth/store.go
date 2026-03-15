@@ -111,9 +111,8 @@ func generateID() (string, error) {
 //
 // A single atomic INSERT … ON CONFLICT … DO UPDATE is used so that concurrent
 // logins never race between a SELECT and a subsequent INSERT or UPDATE.
-// The created bool is derived from the RETURNING values: for a new row
-// created_at equals last_login (both set to now); for an existing row
-// created_at predates last_login.
+// The created bool is derived from the RETURNING id: for a new row SQLite
+// returns the id we generated; for an existing row it returns the pre-existing id.
 func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -131,7 +130,7 @@ func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 		return nil, false, err
 	}
 
-	var returnedID, returnedCreatedAt string
+	var returnedID string
 	err = s.db.QueryRow(`
 		INSERT INTO users (id, provider_name, external_id, email, name, avatar_url, orgs, teams, last_login, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -142,17 +141,18 @@ func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 			orgs       = excluded.orgs,
 			teams      = excluded.teams,
 			last_login = excluded.last_login
-		RETURNING id, created_at`,
+		RETURNING id`,
 		id, identity.ProviderName, identity.ExternalID,
 		identity.Email, identity.Name, identity.AvatarURL,
 		string(orgsJSON), string(teamsJSON), now, now,
-	).Scan(&returnedID, &returnedCreatedAt)
+	).Scan(&returnedID)
 	if err != nil {
 		return nil, false, fmt.Errorf("upserting user: %w", err)
 	}
 
-	// For a new row created_at == now; for an existing row created_at predates now.
-	created := returnedCreatedAt == now
+	// For a new row SQLite returns the id we supplied; for an existing row it
+	// returns the pre-existing id, which differs from our freshly-generated one.
+	created := returnedID == id
 
 	user, err := s.GetUser(returnedID)
 	if err != nil {

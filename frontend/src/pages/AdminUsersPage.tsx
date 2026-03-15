@@ -247,6 +247,7 @@ export function AdminUsersPage() {
                         size="icon"
                         onClick={() => setEditUser(user)}
                         title="Edit Roles"
+                        aria-label="Edit roles"
                       >
                         <Shield className="h-4 w-4" />
                       </Button>
@@ -255,6 +256,7 @@ export function AdminUsersPage() {
                         size="icon"
                         onClick={() => setDeleteTarget(user)}
                         title="Delete User"
+                        aria-label="Delete user"
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />

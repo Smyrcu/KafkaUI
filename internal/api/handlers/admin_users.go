@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -130,7 +131,11 @@ func (h *AdminUsersHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "id")
 	if err := h.store.DeleteUser(id); err != nil {
-		writeError(w, http.StatusNotFound, "user not found")
+		if errors.Is(err, auth.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+		} else {
+			writeInternalError(w, "deleting user", err)
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "user deleted"})

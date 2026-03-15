@@ -16,6 +16,7 @@ import {
   Settings,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import {
   Sidebar,
   SidebarContent,
@@ -45,6 +46,7 @@ const clusterNavItems = [
 export function AppSidebar() {
   const { clusterName } = useParams();
   const location = useLocation();
+  const canManageUsers = useHasAction("manage_users");
 
   const { data: clusters } = useQuery({
     queryKey: ["clusters"],
@@ -111,6 +113,20 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {canManageUsers && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === "/admin/users"}
+                    tooltip="Users"
+                  >
+                    <Link to="/admin/users">
+                      <UserCog className="h-4 w-4" />
+                      <span>Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
