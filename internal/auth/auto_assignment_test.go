@@ -140,6 +140,41 @@ func TestAutoAssign_GitHubOrgMatch(t *testing.T) {
 	})
 }
 
+func TestAutoAssign_GitHubOrgMatchCaseInsensitive(t *testing.T) {
+	t.Run("config upper, identity lower", func(t *testing.T) {
+		rules := []config.AutoAssignmentRule{
+			{Role: "engineer", Match: config.AutoAssignmentMatch{GitHubOrgs: []string{"My-Org"}}},
+		}
+		identity := &UserIdentity{Email: "dev@example.com", Orgs: []string{"my-org"}}
+		roles := AutoAssign(rules, identity)
+		if len(roles) != 1 || roles[0] != "engineer" {
+			t.Errorf("expected case-insensitive match [engineer], got %v", roles)
+		}
+	})
+
+	t.Run("config lower, identity upper", func(t *testing.T) {
+		rules := []config.AutoAssignmentRule{
+			{Role: "engineer", Match: config.AutoAssignmentMatch{GitHubOrgs: []string{"my-org"}}},
+		}
+		identity := &UserIdentity{Email: "dev@example.com", Orgs: []string{"MY-ORG"}}
+		roles := AutoAssign(rules, identity)
+		if len(roles) != 1 || roles[0] != "engineer" {
+			t.Errorf("expected case-insensitive match [engineer], got %v", roles)
+		}
+	})
+
+	t.Run("GitLabGroups case-insensitive", func(t *testing.T) {
+		rules := []config.AutoAssignmentRule{
+			{Role: "member", Match: config.AutoAssignmentMatch{GitLabGroups: []string{"Company/Backend"}}},
+		}
+		identity := &UserIdentity{Email: "dev@example.com", Orgs: []string{"company/backend"}}
+		roles := AutoAssign(rules, identity)
+		if len(roles) != 1 || roles[0] != "member" {
+			t.Errorf("expected case-insensitive GitLab match [member], got %v", roles)
+		}
+	})
+}
+
 func TestAutoAssign_ANDLogicWithinMatch(t *testing.T) {
 	rules := []config.AutoAssignmentRule{
 		{Role: "trusted", Match: config.AutoAssignmentMatch{

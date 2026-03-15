@@ -6,8 +6,14 @@ import "context"
 type IdentityProvider interface {
 	Name() string
 	Type() string // "oidc" | "oauth2"
-	AuthCodeURL(state string) string
-	Exchange(ctx context.Context, code string) (*UserIdentity, error)
+	// AuthCodeURL builds the provider redirect URL. nonce is an opaque
+	// value that OIDC providers embed in the ID token to prevent replay
+	// attacks; OAuth2-only providers (e.g. GitHub) may ignore it.
+	AuthCodeURL(state, nonce string) string
+	// Exchange trades the authorization code for an identity. For OIDC
+	// providers the expectedNonce is verified against the ID token claim;
+	// OAuth2-only providers may ignore it.
+	Exchange(ctx context.Context, code, expectedNonce string) (*UserIdentity, error)
 }
 
 // UserIdentity is the normalized identity returned by any provider.

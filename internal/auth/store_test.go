@@ -201,7 +201,10 @@ func TestResolveRoles_AdminOverrideTakesPrecedence(t *testing.T) {
 		{Role: "viewer", Match: config.AutoAssignmentMatch{Authenticated: true}},
 	}
 
-	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "a@co.com"}, rules, "viewer")
+	roles, err := ResolveRoles(store, user.ID, &UserIdentity{Email: "a@co.com"}, rules, "viewer")
+	if err != nil {
+		t.Fatalf("ResolveRoles() error: %v", err)
+	}
 	if len(roles) != 1 || roles[0] != "admin" {
 		t.Errorf("expected [admin] override, got %v", roles)
 	}
@@ -217,7 +220,10 @@ func TestResolveRoles_FallsBackToAutoAssign(t *testing.T) {
 		{Role: "operator", Match: config.AutoAssignmentMatch{EmailDomains: []string{"@company.com"}}},
 	}
 
-	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "b@company.com"}, rules, "viewer")
+	roles, err := ResolveRoles(store, user.ID, &UserIdentity{Email: "b@company.com"}, rules, "viewer")
+	if err != nil {
+		t.Fatalf("ResolveRoles() error: %v", err)
+	}
 	if len(roles) != 1 || roles[0] != "operator" {
 		t.Errorf("expected [operator] via auto-assign, got %v", roles)
 	}
@@ -229,8 +235,22 @@ func TestResolveRoles_FallsBackToDefault(t *testing.T) {
 
 	user, _, _ := store.UpsertUser(&UserIdentity{ProviderName: "google", ExternalID: "3", Email: "c@other.com", Name: "C"})
 
-	roles := ResolveRoles(store, user.ID, &UserIdentity{Email: "c@other.com"}, nil, "viewer")
+	roles, err := ResolveRoles(store, user.ID, &UserIdentity{Email: "c@other.com"}, nil, "viewer")
+	if err != nil {
+		t.Fatalf("ResolveRoles() error: %v", err)
+	}
 	if len(roles) != 1 || roles[0] != "viewer" {
 		t.Errorf("expected [viewer] default, got %v", roles)
+	}
+}
+
+func TestResolveRoles_ErrorOnStoreFailure(t *testing.T) {
+	store, _ := NewUserStore(":memory:")
+	// Close the store to force a DB error on GetRoles.
+	store.Close()
+
+	_, err := ResolveRoles(store, "any-user-id", &UserIdentity{Email: "x@co.com"}, nil, "viewer")
+	if err == nil {
+		t.Fatal("expected error when store is closed, got nil")
 	}
 }

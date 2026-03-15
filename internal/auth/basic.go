@@ -22,6 +22,17 @@ func NewBasicAuthenticator(users []config.BasicUser) *BasicAuthenticator {
 	return &BasicAuthenticator{users: m}
 }
 
+// ConfigRoles returns the roles configured for the given username in the YAML
+// config file, or nil if the user is not found or has no roles configured.
+// These roles are used as admin overrides when no DB role assignments exist.
+func (a *BasicAuthenticator) ConfigRoles(username string) []string {
+	u, ok := a.users[username]
+	if !ok {
+		return nil
+	}
+	return u.Roles
+}
+
 // Authenticate checks username/password against configured users.
 // Returns a UserIdentity on success or an error on failure.
 // The error message is intentionally generic to prevent user enumeration.

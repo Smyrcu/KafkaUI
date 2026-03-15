@@ -97,17 +97,22 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code, expectedNonce string)
 }
 
 // extractIdentity parses the ID token claims into a UserIdentity struct. It
-// checks multiple common claim keys for groups/roles since different OIDC
-// providers use different conventions (e.g., Keycloak uses realm_access.roles,
-// others use groups).
+// checks multiple common claim keys for group membership since different OIDC
+// providers use different conventions (e.g., Keycloak uses realm_access.roles
+// to represent group membership, others use a top-level groups claim).
+//
+// Claim mapping:
+//   - groups             → Orgs (standard group membership)
+//   - realm_access.roles → Orgs (Keycloak group-style membership)
+//   - roles              → ignored; top-level roles are managed via UserStore,
+//     not derived from token claims.
 func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity, error) {
 	var claims struct {
-		Subject       string   `json:"sub"`
-		Email         string   `json:"email"`
-		EmailVerified *bool    `json:"email_verified"`
-		Name          string   `json:"name"`
-		Picture       string   `json:"picture"`
-		Roles         []string `json:"roles"`
+		Subject       string `json:"sub"`
+		Email         string `json:"email"`
+		EmailVerified *bool  `json:"email_verified"`
+		Name          string `json:"name"`
+		Picture       string `json:"picture"`
 		Groups        []string `json:"groups"`
 		RealmAccess   struct {
 			Roles []string `json:"roles"`
@@ -134,7 +139,8 @@ func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity,
 		AvatarURL:    claims.Picture,
 	}
 
-	// Populate Orgs from the most specific group claim available, in priority order.
+	// Populate Orgs from the group claim available, preferring the standard
+	// groups claim over Keycloak's realm_access.roles group representation.
 	switch {
 	case len(claims.Groups) > 0:
 		identity.Orgs = claims.Groups

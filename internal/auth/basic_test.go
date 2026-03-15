@@ -90,3 +90,34 @@ func TestBasicAuthenticator_EmptyUsers(t *testing.T) {
 		t.Fatal("expected error with no users configured")
 	}
 }
+
+func TestBasicAuthenticator_ConfigRoles(t *testing.T) {
+	a := NewBasicAuthenticator([]config.BasicUser{
+		{Username: "admin", Password: hashPassword(t, "secret"), Roles: []string{"admin", "operator"}},
+		{Username: "viewer", Password: hashPassword(t, "pass"), Roles: nil},
+	})
+
+	t.Run("user with roles returns them", func(t *testing.T) {
+		roles := a.ConfigRoles("admin")
+		if len(roles) != 2 {
+			t.Fatalf("expected 2 config roles, got %v", roles)
+		}
+		if roles[0] != "admin" || roles[1] != "operator" {
+			t.Errorf("unexpected roles: %v", roles)
+		}
+	})
+
+	t.Run("user without roles returns nil", func(t *testing.T) {
+		roles := a.ConfigRoles("viewer")
+		if len(roles) != 0 {
+			t.Errorf("expected no roles, got %v", roles)
+		}
+	})
+
+	t.Run("unknown user returns nil", func(t *testing.T) {
+		roles := a.ConfigRoles("nobody")
+		if roles != nil {
+			t.Errorf("expected nil for unknown user, got %v", roles)
+		}
+	})
+}

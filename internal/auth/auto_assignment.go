@@ -80,12 +80,14 @@ func matchesRule(match config.AutoAssignmentMatch, identity *UserIdentity) bool 
 }
 
 func hasOverlap(a, b []string) bool {
+	// Use case-insensitive comparison: GitHub/GitLab slugs are case-insensitive,
+	// so config value "My-Org" must match identity value "my-org".
 	set := make(map[string]bool, len(b))
 	for _, v := range b {
-		set[v] = true
+		set[strings.ToLower(v)] = true
 	}
 	for _, v := range a {
-		if set[v] {
+		if set[strings.ToLower(v)] {
 			return true
 		}
 	}

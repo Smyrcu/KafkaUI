@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -180,6 +181,59 @@ func TestAdminUsers_SetRoles_NotFound(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d; body: %s", rec.Code, rec.Body.String())
 	}
+}
+
+func TestAdminUsers_SetRoles_Validation(t *testing.T) {
+	store := newTestUserStore(t)
+	created := mustUpsertUser(t, store, "ext-val", "frank@example.com", "Frank")
+	r := newAdminUsersRouter(store)
+
+	send := func(roles []string) int {
+		body, _ := json.Marshal(map[string]any{"roles": roles})
+		req := httptest.NewRequest(http.MethodPut, "/admin/users/"+created.ID+"/roles", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	t.Run("empty role name", func(t *testing.T) {
+		if code := send([]string{""}); code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", code)
+		}
+	})
+
+	t.Run("role name too long", func(t *testing.T) {
+		long := make([]byte, 65)
+		for i := range long {
+			long[i] = 'a'
+		}
+		if code := send([]string{string(long)}); code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", code)
+		}
+	})
+
+	t.Run("invalid characters in role name", func(t *testing.T) {
+		if code := send([]string{"bad role!"}); code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", code)
+		}
+	})
+
+	t.Run("too many roles", func(t *testing.T) {
+		roles := make([]string, 11)
+		for i := range roles {
+			roles[i] = fmt.Sprintf("role%d", i)
+		}
+		if code := send(roles); code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", code)
+		}
+	})
+
+	t.Run("valid role names accepted", func(t *testing.T) {
+		if code := send([]string{"admin", "viewer-2", "editor_role"}); code != http.StatusOK {
+			t.Errorf("expected 200, got %d", code)
+		}
+	})
 }
 
 func TestAdminUsers_Delete(t *testing.T) {
