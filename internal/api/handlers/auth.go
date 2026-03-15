@@ -15,32 +15,61 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
-type AuthHandler struct {
-	providers   map[string]*auth.OIDCProvider
-	providerCfg []config.OIDCProvider
-	basic       *auth.BasicAuthenticator
-	rateLimiter *auth.LoginRateLimiter
-	sessions    *auth.SessionManager
-	logger      *slog.Logger
-	enabled     bool
-	authTypes   []string
+// AuthHandlerDeps groups the dependencies for AuthHandler construction.
+type AuthHandlerDeps struct {
+	Providers    map[string]auth.IdentityProvider
+	ProviderList []auth.ProviderInfo
+	Basic        *auth.BasicAuthenticator
+	RateLimiter  *auth.LoginRateLimiter
+	Sessions     *auth.SessionManager
+	UserStore    *auth.UserStore
+	RBAC         *auth.RBAC
+	AutoRules    []config.AutoAssignmentRule
+	DefaultRole  string
+	Logger       *slog.Logger
+	Enabled      bool
+	AuthTypes    []string
 }
 
-func NewAuthHandler(providers map[string]*auth.OIDCProvider, providerCfg []config.OIDCProvider, basic *auth.BasicAuthenticator, rateLimiter *auth.LoginRateLimiter, sessions *auth.SessionManager, logger *slog.Logger, enabled bool, authTypes []string) *AuthHandler {
+type AuthHandler struct {
+	providers    map[string]auth.IdentityProvider
+	providerList []auth.ProviderInfo
+	basic        *auth.BasicAuthenticator
+	rateLimiter  *auth.LoginRateLimiter
+	sessions     *auth.SessionManager
+	userStore    *auth.UserStore
+	rbac         *auth.RBAC
+	autoRules    []config.AutoAssignmentRule
+	defaultRole  string
+	logger       *slog.Logger
+	enabled      bool
+	authTypes    []string
+}
+
+func NewAuthHandler(deps AuthHandlerDeps) *AuthHandler {
 	return &AuthHandler{
-		providers:   providers,
-		providerCfg: providerCfg,
-		basic:       basic,
-		rateLimiter: rateLimiter,
-		sessions:    sessions,
-		logger:      logger,
-		enabled:     enabled,
-		authTypes:   authTypes,
+		providers:    deps.Providers,
+		providerList: deps.ProviderList,
+		basic:        deps.Basic,
+		rateLimiter:  deps.RateLimiter,
+		sessions:     deps.Sessions,
+		userStore:    deps.UserStore,
+		rbac:         deps.RBAC,
+		autoRules:    deps.AutoRules,
+		defaultRole:  deps.DefaultRole,
+		logger:       deps.Logger,
+		enabled:      deps.Enabled,
+		authTypes:    deps.AuthTypes,
 	}
 }
 
 func (h *AuthHandler) hasType(t string) bool {
 	return slices.Contains(h.authTypes, t)
+}
+
+// hasExternalAuth returns true if "oidc" or "oauth2" is in the configured auth types.
+func (h *AuthHandler) hasExternalAuth() bool {
+	return h.hasType("oidc") || h.hasType("oauth2")
 }
 
 func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
@@ -73,14 +102,25 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.basic.Authenticate(req.Username, req.Password)
+	identity, err := h.basic.Authenticate(req.Username, req.Password)
 	if err != nil {
 		h.logger.Warn("login failed", "username", req.Username, "ip", ip)
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
-	if err := h.sessions.CreateSession(w, r, *session); err != nil {
+	// Upsert user in the store and resolve roles
+	user, roles, err := h.upsertAndResolve(identity)
+	if err != nil {
+		writeInternalError(w, "upserting user", err)
+		return
+	}
+
+	if err := h.sessions.CreateSession(w, r, auth.SessionData{
+		UserID: user.ID,
+		Email:  user.Email,
+		Name:   user.Name,
+	}); err != nil {
 		writeInternalError(w, "creating session", err)
 		return
 	}
@@ -88,21 +128,22 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("login successful", "username", req.Username, "ip", ip)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
-		"name":          session.Name,
-		"roles":         session.Roles,
+		"name":          user.Name,
+		"roles":         roles,
 	})
 }
 
-func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || !h.hasType("oidc") {
-		writeError(w, http.StatusNotFound, "oidc auth not enabled")
+// LoginProvider initiates an external auth flow (OIDC or OAuth2).
+func (h *AuthHandler) LoginProvider(w http.ResponseWriter, r *http.Request) {
+	if !h.enabled || !h.hasExternalAuth() {
+		writeError(w, http.StatusNotFound, "external auth not enabled")
 		return
 	}
 
 	providerName := chi.URLParam(r, "provider")
 	provider, ok := h.providers[providerName]
 	if !ok {
-		writeError(w, http.StatusNotFound, "unknown OIDC provider: "+providerName)
+		writeError(w, http.StatusNotFound, "unknown provider: "+providerName)
 		return
 	}
 
@@ -123,8 +164,8 @@ func (h *AuthHandler) LoginOIDC(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || !h.hasType("oidc") {
-		writeError(w, http.StatusNotFound, "oidc auth not enabled")
+	if !h.enabled || !h.hasExternalAuth() {
+		writeError(w, http.StatusNotFound, "external auth not enabled")
 		return
 	}
 
@@ -157,7 +198,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	provider, ok := h.providers[providerName]
 	if !ok {
-		writeError(w, http.StatusBadRequest, "unknown OIDC provider in state: "+providerName)
+		writeError(w, http.StatusBadRequest, "unknown provider in state: "+providerName)
 		return
 	}
 
@@ -171,16 +212,23 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := provider.Exchange(r.Context(), code)
 	if err != nil {
-		writeInternalError(w, "exchanging OIDC code", err)
+		writeInternalError(w, "exchanging auth code", err)
+		return
+	}
+
+	// Upsert user in the store and resolve roles
+	user, _, err := h.upsertAndResolve(identity)
+	if err != nil {
+		writeInternalError(w, "upserting user", err)
 		return
 	}
 
 	if err := h.sessions.CreateSession(w, r, auth.SessionData{
-		Email: identity.Email,
-		Name:  identity.Name,
-		Roles: identity.Orgs,
+		UserID: user.ID,
+		Email:  user.Email,
+		Name:   user.Name,
 	}); err != nil {
-		writeInternalError(w, "creating OIDC session", err)
+		writeInternalError(w, "creating session", err)
 		return
 	}
 
@@ -226,11 +274,26 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load full user from store to get current roles
+	if h.userStore != nil {
+		user, err := h.userStore.GetUser(session.UserID)
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"authenticated": true,
+				"email":         user.Email,
+				"name":          user.Name,
+				"roles":         user.Roles,
+			})
+			return
+		}
+	}
+
+	// Fallback: return session data without roles
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
 		"email":         session.Email,
 		"name":          session.Name,
-		"roles":         session.Roles,
+		"roles":         []string{},
 	})
 }
 
@@ -241,10 +304,11 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var providers []map[string]string
-	for _, p := range h.providerCfg {
+	for _, p := range h.providerList {
 		providers = append(providers, map[string]string{
 			"name":        p.Name,
 			"displayName": p.DisplayName,
+			"type":        p.Type,
 		})
 	}
 
@@ -253,6 +317,24 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 		"types":     types,
 		"providers": providers,
 	})
+}
+
+// upsertAndResolve persists the identity and resolves effective roles.
+func (h *AuthHandler) upsertAndResolve(identity *auth.UserIdentity) (*auth.User, []string, error) {
+	if h.userStore == nil {
+		return &auth.User{
+			Email: identity.Email,
+			Name:  identity.Name,
+		}, []string{}, nil
+	}
+
+	user, _, err := h.userStore.UpsertUser(identity)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	roles := auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)
+	return user, roles, nil
 }
 
 func generateState() string {

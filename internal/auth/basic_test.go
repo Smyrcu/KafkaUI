@@ -21,18 +21,24 @@ func TestBasicAuthenticator_ValidCredentials(t *testing.T) {
 		{Username: "admin", Password: hashPassword(t, "secret"), Roles: []string{"admin"}},
 	})
 
-	session, err := auth.Authenticate("admin", "secret")
+	identity, err := auth.Authenticate("admin", "secret")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if session.Name != "admin" {
-		t.Errorf("expected name 'admin', got %q", session.Name)
+	if identity.Name != "admin" {
+		t.Errorf("expected name 'admin', got %q", identity.Name)
 	}
-	if session.Email != "admin" {
-		t.Errorf("expected email 'admin', got %q", session.Email)
+	if identity.Email != "admin" {
+		t.Errorf("expected email 'admin', got %q", identity.Email)
 	}
-	if len(session.Roles) != 1 || session.Roles[0] != "admin" {
-		t.Errorf("expected roles [admin], got %v", session.Roles)
+	if identity.ProviderName != "basic" {
+		t.Errorf("expected providerName 'basic', got %q", identity.ProviderName)
+	}
+	if identity.ProviderType != "basic" {
+		t.Errorf("expected providerType 'basic', got %q", identity.ProviderType)
+	}
+	if identity.ExternalID != "admin" {
+		t.Errorf("expected externalID 'admin', got %q", identity.ExternalID)
 	}
 }
 
@@ -64,15 +70,15 @@ func TestBasicAuthenticator_MultipleUsers(t *testing.T) {
 		{Username: "viewer", Password: hashPassword(t, "viewerpass"), Roles: []string{"viewer"}},
 	})
 
-	session, err := auth.Authenticate("viewer", "viewerpass")
+	identity, err := auth.Authenticate("viewer", "viewerpass")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if session.Name != "viewer" {
-		t.Errorf("expected name 'viewer', got %q", session.Name)
+	if identity.Name != "viewer" {
+		t.Errorf("expected name 'viewer', got %q", identity.Name)
 	}
-	if len(session.Roles) != 1 || session.Roles[0] != "viewer" {
-		t.Errorf("expected roles [viewer], got %v", session.Roles)
+	if identity.ExternalID != "viewer" {
+		t.Errorf("expected externalID 'viewer', got %q", identity.ExternalID)
 	}
 }
 

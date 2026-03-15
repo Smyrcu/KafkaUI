@@ -43,7 +43,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
 	healthHandler := handlers.NewHealthHandler(deps.Registry)
 
-	authHandler := handlers.NewAuthHandler(deps.OIDCProviders, deps.OIDCProviderCfg, deps.BasicAuth, deps.RateLimiter, deps.Sessions, deps.Logger, deps.AuthEnabled, deps.AuthTypes)
+	authHandler := handlers.NewAuthHandler(handlers.AuthHandlerDeps{
+		Providers:    deps.Providers,
+		ProviderList: deps.ProviderList,
+		Basic:        deps.BasicAuth,
+		RateLimiter:  deps.RateLimiter,
+		Sessions:     deps.Sessions,
+		UserStore:    deps.UserStore,
+		RBAC:         deps.RBAC,
+		AutoRules:    deps.AutoAssignment,
+		DefaultRole:  deps.DefaultRole,
+		Logger:       deps.Logger,
+		Enabled:      deps.AuthEnabled,
+		AuthTypes:    deps.AuthTypes,
+	})
 
 	// Health probes — top-level, no auth
 	r.Get("/healthz", healthHandler.Liveness)
@@ -62,7 +75,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// Auth endpoints — no auth middleware (must be accessible unauthenticated)
 		r.Get("/auth/status", authHandler.Status)
 		r.Post("/auth/login", authHandler.LoginBasic)
-		r.Get("/auth/login/{provider}", authHandler.LoginOIDC)
+		r.Get("/auth/login/{provider}", authHandler.LoginProvider)
 		r.Get("/auth/callback", authHandler.Callback)
 		r.Get("/auth/me", authHandler.Me)
 		r.Post("/auth/logout", authHandler.Logout)
@@ -75,7 +88,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			r.Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
-				r.Use(middleware.RequireRole("admin", deps.AuthEnabled))
+				r.Use(middleware.RequireRole("admin", deps.AuthEnabled, deps.UserStore))
 				r.Get("/clusters", adminHandler.ListClusters)
 				r.Post("/clusters", adminHandler.AddCluster)
 				r.Post("/clusters/test", adminHandler.TestConnection)

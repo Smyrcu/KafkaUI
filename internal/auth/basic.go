@@ -23,9 +23,9 @@ func NewBasicAuthenticator(users []config.BasicUser) *BasicAuthenticator {
 }
 
 // Authenticate checks username/password against configured users.
-// Returns SessionData on success or an error on failure.
+// Returns a UserIdentity on success or an error on failure.
 // The error message is intentionally generic to prevent user enumeration.
-func (a *BasicAuthenticator) Authenticate(username, password string) (*SessionData, error) {
+func (a *BasicAuthenticator) Authenticate(username, password string) (*UserIdentity, error) {
 	user, ok := a.users[username]
 	if !ok {
 		// Spend time on bcrypt to prevent timing attacks
@@ -37,9 +37,11 @@ func (a *BasicAuthenticator) Authenticate(username, password string) (*SessionDa
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	return &SessionData{
-		Email: user.Username,
-		Name:  user.Username,
-		Roles: user.Roles,
+	return &UserIdentity{
+		ProviderName: "basic",
+		ProviderType: "basic",
+		ExternalID:   user.Username,
+		Email:        user.Username,
+		Name:         user.Username,
 	}, nil
 }

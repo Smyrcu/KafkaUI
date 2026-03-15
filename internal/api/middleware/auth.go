@@ -35,7 +35,8 @@ func Auth(sessions *auth.SessionManager, authEnabled bool) func(http.Handler) ht
 
 // RequireRole returns middleware that restricts access to users with the given role.
 // When auth is disabled, all requests are allowed through.
-func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler {
+// Roles are resolved from the UserStore by the session's UserID.
+func RequireRole(role string, authEnabled bool, store *auth.UserStore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !authEnabled {
@@ -49,7 +50,18 @@ func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler 
 				return
 			}
 
-			if !slices.Contains(session.Roles, role) {
+			if store == nil {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
+
+			roles, err := store.GetRoles(session.UserID)
+			if err != nil {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
+
+			if !slices.Contains(roles, role) {
 				http.Error(w, `{"error":"forbidden: admin role required"}`, http.StatusForbidden)
 				return
 			}
@@ -58,4 +70,3 @@ func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler 
 		})
 	}
 }
-

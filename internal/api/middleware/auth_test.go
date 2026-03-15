@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,10 +53,9 @@ func TestAuth_Enabled_ValidSession_PassesThrough(t *testing.T) {
 
 	// Create a session by recording the Set-Cookie from CreateSession.
 	sessionData := auth.SessionData{
-		Token: "test-token",
-		Email: "alice@example.com",
-		Name:  "Alice",
-		Roles: []string{"admin"},
+		UserID: "user-123",
+		Email:  "alice@example.com",
+		Name:   "Alice",
 	}
 
 	// Use a recorder to capture the session cookie set by CreateSession.
@@ -87,8 +87,8 @@ func TestAuth_Enabled_ValidSession_PassesThrough(t *testing.T) {
 		if sd.Name != "Alice" {
 			t.Errorf("expected name 'Alice', got %q", sd.Name)
 		}
-		if len(sd.Roles) != 1 || sd.Roles[0] != "admin" {
-			t.Errorf("expected roles [admin], got %v", sd.Roles)
+		if sd.UserID != "user-123" {
+			t.Errorf("expected user_id 'user-123', got %q", sd.UserID)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -132,9 +132,9 @@ func TestAuth_Enabled_TamperedCookie_Returns401(t *testing.T) {
 	sm1 := auth.NewSessionManager("secret-one", 3600)
 
 	sessionData := auth.SessionData{
-		Token: "test-token",
-		Email: "alice@example.com",
-		Name:  "Alice",
+		UserID: "user-123",
+		Email:  "alice@example.com",
+		Name:   "Alice",
 	}
 
 	cookieReq := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -166,5 +166,129 @@ func TestAuth_Enabled_TamperedCookie_Returns401(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_Disabled_PassesThrough(t *testing.T) {
+	handler := RequireRole("admin", false, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 when auth disabled, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_NoSession_Returns401(t *testing.T) {
+	handler := RequireRole("admin", true, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called without session")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_NilStore_Returns403(t *testing.T) {
+	session := &auth.SessionData{UserID: "user-123", Email: "test@test.com", Name: "Test"}
+	ctx := context.WithValue(context.Background(), UserContextKey, session)
+
+	handler := RequireRole("admin", true, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called with nil store")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_UserHasRole_PassesThrough(t *testing.T) {
+	store, err := auth.NewUserStore(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create user store: %v", err)
+	}
+	defer store.Close()
+
+	// Create a user and assign the admin role
+	user, _, err := store.UpsertUser(&auth.UserIdentity{
+		ProviderName: "basic",
+		ExternalID:   "admin-user",
+		Email:        "admin@test.com",
+		Name:         "Admin",
+	})
+	if err != nil {
+		t.Fatalf("failed to upsert user: %v", err)
+	}
+	if err := store.AssignRole(user.ID, "admin"); err != nil {
+		t.Fatalf("failed to assign role: %v", err)
+	}
+
+	session := &auth.SessionData{UserID: user.ID, Email: user.Email, Name: user.Name}
+	ctx := context.WithValue(context.Background(), UserContextKey, session)
+
+	handler := RequireRole("admin", true, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestRequireRole_UserLacksRole_Returns403(t *testing.T) {
+	store, err := auth.NewUserStore(":memory:")
+	if err != nil {
+		t.Fatalf("failed to create user store: %v", err)
+	}
+	defer store.Close()
+
+	// Create a user with "viewer" role only
+	user, _, err := store.UpsertUser(&auth.UserIdentity{
+		ProviderName: "basic",
+		ExternalID:   "viewer-user",
+		Email:        "viewer@test.com",
+		Name:         "Viewer",
+	})
+	if err != nil {
+		t.Fatalf("failed to upsert user: %v", err)
+	}
+	if err := store.AssignRole(user.ID, "viewer"); err != nil {
+		t.Fatalf("failed to assign role: %v", err)
+	}
+
+	session := &auth.SessionData{UserID: user.ID, Email: user.Email, Name: user.Name}
+	ctx := context.WithValue(context.Background(), UserContextKey, session)
+
+	handler := RequireRole("admin", true, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called when user lacks required role")
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
 	}
 }

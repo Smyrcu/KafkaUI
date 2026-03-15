@@ -6,11 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Smyrcu/KafkaUI/internal/config"
+	"github.com/Smyrcu/KafkaUI/internal/auth"
 )
 
 func TestStatus_AuthDisabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, false, nil)
+	h := NewAuthHandler(AuthHandlerDeps{Enabled: false})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -35,7 +35,7 @@ func TestStatus_AuthDisabled(t *testing.T) {
 }
 
 func TestStatus_BasicOnly(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic"})
+	h := NewAuthHandler(AuthHandlerDeps{Enabled: true, AuthTypes: []string{"basic"}})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestStatus_BasicOnly(t *testing.T) {
 }
 
 func TestStatus_MultiAuth(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic", "oidc"})
+	h := NewAuthHandler(AuthHandlerDeps{Enabled: true, AuthTypes: []string{"basic", "oidc"}})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -75,7 +75,7 @@ func TestStatus_MultiAuth(t *testing.T) {
 }
 
 func TestLoginBasic_NotEnabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"oidc"})
+	h := NewAuthHandler(AuthHandlerDeps{Enabled: true, AuthTypes: []string{"oidc"}})
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/login", nil)
 	rr := httptest.NewRecorder()
@@ -88,11 +88,15 @@ func TestLoginBasic_NotEnabled(t *testing.T) {
 }
 
 func TestStatus_MultiAuthWithProviders(t *testing.T) {
-	providerCfg := []config.OIDCProvider{
-		{Name: "google"},
-		{Name: "auth0", DisplayName: "Auth0"},
+	providerList := []auth.ProviderInfo{
+		{Name: "google", Type: "oidc"},
+		{Name: "auth0", DisplayName: "Auth0", Type: "oidc"},
 	}
-	h := NewAuthHandler(nil, providerCfg, nil, nil, nil, nil, true, []string{"basic", "oidc"})
+	h := NewAuthHandler(AuthHandlerDeps{
+		Enabled:      true,
+		AuthTypes:    []string{"basic", "oidc"},
+		ProviderList: providerList,
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/status", nil)
 	rr := httptest.NewRecorder()
@@ -116,6 +120,9 @@ func TestStatus_MultiAuthWithProviders(t *testing.T) {
 	if p0["name"] != "google" {
 		t.Errorf("expected first provider 'google', got %v", p0["name"])
 	}
+	if p0["type"] != "oidc" {
+		t.Errorf("expected first provider type 'oidc', got %v", p0["type"])
+	}
 
 	p1 := providers[1].(map[string]any)
 	if p1["name"] != "auth0" {
@@ -126,15 +133,15 @@ func TestStatus_MultiAuthWithProviders(t *testing.T) {
 	}
 }
 
-func TestLoginOIDC_NotEnabled(t *testing.T) {
-	h := NewAuthHandler(nil, nil, nil, nil, nil, nil, true, []string{"basic"})
+func TestLoginProvider_NotEnabled(t *testing.T) {
+	h := NewAuthHandler(AuthHandlerDeps{Enabled: true, AuthTypes: []string{"basic"}})
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/login", nil)
 	rr := httptest.NewRecorder()
 
-	h.LoginOIDC(rr, req)
+	h.LoginProvider(rr, req)
 
 	if rr.Code != http.StatusNotFound {
-		t.Errorf("expected 404 when oidc not in types, got %d", rr.Code)
+		t.Errorf("expected 404 when external auth not in types, got %d", rr.Code)
 	}
 }

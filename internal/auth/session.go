@@ -23,11 +23,10 @@ type SessionManager struct {
 
 // SessionData holds the user information stored within the session cookie.
 type SessionData struct {
-	Token     string   `json:"token"`
-	Email     string   `json:"email"`
-	Name      string   `json:"name"`
-	Roles     []string `json:"roles"`
-	CreatedAt int64    `json:"created_at"`
+	UserID    string `json:"user_id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 // NewSessionManager creates a new SessionManager with the given secret and maximum age in seconds.

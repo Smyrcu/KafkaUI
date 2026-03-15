@@ -22,6 +22,13 @@ type UserIdentity struct {
 	Teams        []string
 }
 
+// ProviderInfo describes an external auth provider for the /auth/status endpoint.
+type ProviderInfo struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Type        string `json:"type"`
+}
+
 // User is the persisted user record from SQLite.
 type User struct {
 	ID           string   `json:"id"`
