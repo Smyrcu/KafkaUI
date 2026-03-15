@@ -50,6 +50,11 @@ auth:
     secret: "${SESSION_SECRET}"
     max-age: 86400
 
+  storage:
+    path: "/data/kafkaui-users.db"   # writable path for the SQLite user store
+
+  default-role: viewer               # fallback role when no auto-assignment rule matches
+
   oidc:
     redirect-url: "https://kafkaui.example.com/auth/callback"
 
@@ -63,8 +68,6 @@ auth:
           - openid
           - profile
           - email
-
-  default-role: viewer
 ```
 
 Google's OIDC issuer is always `https://accounts.google.com` — do not change it.
@@ -113,3 +116,99 @@ auth:
 
 - Ensure the server running KafkaUI has accurate system time. Google's token verifier checks the
   `exp` and `iat` claims against the current time with a small tolerance.
+
+## Deployment
+
+### SQLite User Store
+
+KafkaUI stores user records and manually-assigned role overrides in a SQLite database. Set
+`auth.storage.path` to a writable path appropriate for your environment:
+
+```yaml
+auth:
+  storage:
+    path: "/data/kafkaui-users.db"
+```
+
+### Docker
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v kafkaui-data:/data \
+  -e SESSION_SECRET="$(openssl rand -hex 32)" \
+  -e GOOGLE_CLIENT_ID="your_client_id.apps.googleusercontent.com" \
+  -e GOOGLE_CLIENT_SECRET="your_client_secret" \
+  -v /path/to/kafkaui.yaml:/etc/kafkaui/config.yaml \
+  ghcr.io/your-org/kafkaui:latest \
+  --config /etc/kafkaui/config.yaml
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the config to persist the user store across
+container restarts.
+
+### Helm
+
+Store credentials in a Kubernetes Secret:
+
+```bash
+kubectl create secret generic kafkaui-google \
+  --from-literal=SESSION_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=GOOGLE_CLIENT_ID="your_client_id.apps.googleusercontent.com" \
+  --from-literal=GOOGLE_CLIENT_SECRET="your_client_secret"
+```
+
+In `values.yaml`:
+
+```yaml
+env:
+  - name: SESSION_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-google
+        key: SESSION_SECRET
+  - name: GOOGLE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-google
+        key: GOOGLE_CLIENT_ID
+  - name: GOOGLE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-google
+        key: GOOGLE_CLIENT_SECRET
+
+persistence:
+  enabled: true
+  mountPath: /data
+  size: 1Gi
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the KafkaUI config. If the pod has
+`readOnlyRootFilesystem: true`, this persistent volume is required.
+
+### Binary
+
+```bash
+SESSION_SECRET="$(openssl rand -hex 32)" \
+GOOGLE_CLIENT_ID="your_client_id.apps.googleusercontent.com" \
+GOOGLE_CLIENT_SECRET="your_client_secret" \
+./kafkaui --config kafkaui.yaml
+```
+
+## Security
+
+- **Use HTTPS in production.** Google rejects `http://` redirect URIs for any non-localhost address.
+  Configure TLS at the reverse proxy level and register only `https://` URIs in the Cloud Console.
+- **Generate a strong session secret:**
+  ```bash
+  openssl rand -hex 32
+  ```
+  Store the result in `SESSION_SECRET` and reference it as `${SESSION_SECRET}` in the config.
+- **The redirect URI must match exactly.** Register `https://kafkaui.example.com/auth/callback` in
+  **Authorized redirect URIs** and use the same URL in `auth.oidc.redirect-url`. Even a trailing
+  slash difference causes an error.
+
+## See Also
+
+- [Roles and Permissions](roles-and-permissions.md)

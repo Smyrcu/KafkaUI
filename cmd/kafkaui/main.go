@@ -213,10 +213,12 @@ func main() {
 
 	sessionSecret := cfg.Auth.Session.Secret
 	if sessionSecret == "" {
-		sessionSecret = "kafkaui-default-secret-change-me"
 		if cfg.Auth.Enabled {
-			logger.Warn("auth is enabled but no session secret configured — using insecure default. Set auth.session.secret or SESSION_SECRET env var")
+			logger.Error("auth is enabled but session.secret is not configured — refusing to start with a forgeable session secret. Set auth.session.secret or SESSION_SECRET env var")
+			os.Exit(1)
 		}
+		// Auth disabled: use a placeholder so SessionManager initialises without a blank key.
+		sessionSecret = "kafkaui-default-secret-change-me"
 	}
 	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
 

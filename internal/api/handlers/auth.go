@@ -12,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Smyrcu/KafkaUI/internal/auth"
-	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
@@ -110,11 +109,26 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Upsert user in the store and resolve roles
+	// Upsert user in the store and resolve roles.
+	// For basic auth: if the config declares roles for this user and no admin
+	// overrides exist in the DB yet, seed the DB overrides from the config.
+	// This makes the config roles field functional as documented.
 	user, roles, err := h.upsertAndResolve(identity)
 	if err != nil {
 		writeInternalError(w, "upserting user", err)
 		return
+	}
+	if h.userStore != nil {
+		configRoles := h.basic.ConfigRoles(req.Username)
+		if len(configRoles) > 0 {
+			if dbRoles, err := h.userStore.GetRoles(user.ID); err == nil && len(dbRoles) == 0 {
+				for _, role := range configRoles {
+					_ = h.userStore.AssignRole(user.ID, role)
+				}
+				// Re-resolve so the response reflects the newly seeded roles.
+				roles, _ = auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)
+			}
+		}
 	}
 
 	if err := h.sessions.CreateSession(w, r, auth.SessionData{
@@ -150,18 +164,32 @@ func (h *AuthHandler) LoginProvider(w http.ResponseWriter, r *http.Request) {
 
 	randomPart := generateState()
 	state := randomPart + ":" + providerName
+	nonce := generateState()
+
+	secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+	maxAge := int(5 * time.Minute / time.Second)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    state,
 		Path:     "/",
-		MaxAge:   int(5 * time.Minute / time.Second),
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+		Secure:   secure,
 	})
 
-	http.Redirect(w, r, provider.AuthCodeURL(state), http.StatusTemporaryRedirect)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_nonce",
+		Value:    nonce,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
+	})
+
+	http.Redirect(w, r, provider.AuthCodeURL(state, nonce), http.StatusTemporaryRedirect)
 }
 
 func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
@@ -203,6 +231,13 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nonceCookie, err := r.Cookie("oauth_nonce")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "missing oauth_nonce cookie")
+		return
+	}
+	expectedNonce := nonceCookie.Value
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    "",
@@ -211,7 +246,15 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	identity, err := provider.Exchange(r.Context(), code)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_nonce",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	identity, err := provider.Exchange(r.Context(), code, expectedNonce)
 	if err != nil {
 		writeInternalError(w, "exchanging auth code", err)
 		return
@@ -321,20 +364,33 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Permissions(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(middleware.UserContextKey).(*auth.SessionData)
-	if !ok || session == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"actions": []string{}, "clusters": []string{}})
+	empty := map[string]any{"actions": []string{}, "clusters": []string{}}
+
+	if !h.enabled || h.userStore == nil || h.rbac == nil {
+		writeJSON(w, http.StatusOK, empty)
+		return
+	}
+
+	// Resolve session directly — this endpoint is accessible without the Auth
+	// middleware (like /auth/me) so we cannot rely on UserContextKey being set.
+	session, err := h.sessions.GetSession(r)
+	if err != nil {
+		writeJSON(w, http.StatusOK, empty)
 		return
 	}
 
 	user, err := h.userStore.GetUser(session.UserID)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"actions": []string{}, "clusters": []string{}})
+		writeJSON(w, http.StatusOK, empty)
 		return
 	}
 
 	identity := &auth.UserIdentity{Email: user.Email, Orgs: user.Orgs, Teams: user.Teams}
-	roles := auth.ResolveRoles(h.userStore, session.UserID, identity, h.autoRules, h.defaultRole)
+	roles, err := auth.ResolveRoles(h.userStore, session.UserID, identity, h.autoRules, h.defaultRole)
+	if err != nil {
+		writeJSON(w, http.StatusOK, empty)
+		return
+	}
 	actions := h.rbac.ExpandedActions(roles, "*")
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -357,7 +413,10 @@ func (h *AuthHandler) upsertAndResolve(identity *auth.UserIdentity) (*auth.User,
 		return nil, nil, err
 	}
 
-	roles := auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)
+	roles, err := auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)
+	if err != nil {
+		return nil, nil, err
+	}
 	return user, roles, nil
 }
 

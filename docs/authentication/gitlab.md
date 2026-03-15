@@ -59,6 +59,11 @@ auth:
     secret: "${SESSION_SECRET}"
     max-age: 86400
 
+  storage:
+    path: "/data/kafkaui-users.db"   # writable path for the SQLite user store
+
+  default-role: viewer               # fallback role when no auto-assignment rule matches
+
   oidc:
     redirect-url: "https://kafkaui.example.com/auth/callback"
 
@@ -75,8 +80,6 @@ auth:
           - profile
           - email
           - read_api
-
-  default-role: viewer
 ```
 
 ## Auto-Assignment by GitLab Group
@@ -143,3 +146,98 @@ Group paths are case-sensitive and must match the full path as seen in the GitLa
 - Ensure TLS certificates on the GitLab server are valid and trusted by the system where KafkaUI
   runs. Custom CA certificates must be installed in the system trust store or provided via
   `SSL_CERT_FILE` / `SSL_CERT_DIR` environment variables.
+
+## Deployment
+
+### SQLite User Store
+
+KafkaUI stores user records and manually-assigned role overrides in a SQLite database. Set
+`auth.storage.path` to a writable path appropriate for your environment:
+
+```yaml
+auth:
+  storage:
+    path: "/data/kafkaui-users.db"
+```
+
+### Docker
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v kafkaui-data:/data \
+  -e SESSION_SECRET="$(openssl rand -hex 32)" \
+  -e GITLAB_CLIENT_ID="your_application_id" \
+  -e GITLAB_CLIENT_SECRET="your_secret" \
+  -v /path/to/kafkaui.yaml:/etc/kafkaui/config.yaml \
+  ghcr.io/your-org/kafkaui:latest \
+  --config /etc/kafkaui/config.yaml
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the config to persist the user store across
+container restarts.
+
+### Helm
+
+Store credentials in a Kubernetes Secret:
+
+```bash
+kubectl create secret generic kafkaui-gitlab \
+  --from-literal=SESSION_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=GITLAB_CLIENT_ID="your_application_id" \
+  --from-literal=GITLAB_CLIENT_SECRET="your_secret"
+```
+
+In `values.yaml`:
+
+```yaml
+env:
+  - name: SESSION_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-gitlab
+        key: SESSION_SECRET
+  - name: GITLAB_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-gitlab
+        key: GITLAB_CLIENT_ID
+  - name: GITLAB_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-gitlab
+        key: GITLAB_CLIENT_SECRET
+
+persistence:
+  enabled: true
+  mountPath: /data
+  size: 1Gi
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the KafkaUI config. If the pod has
+`readOnlyRootFilesystem: true`, this persistent volume is required.
+
+### Binary
+
+```bash
+SESSION_SECRET="$(openssl rand -hex 32)" \
+GITLAB_CLIENT_ID="your_application_id" \
+GITLAB_CLIENT_SECRET="your_secret" \
+./kafkaui --config kafkaui.yaml
+```
+
+## Security
+
+- **Use HTTPS in production.** The OIDC callback URL must use `https://` — GitLab rejects `http://`
+  redirect URIs for non-localhost addresses.
+- **Generate a strong session secret:**
+  ```bash
+  openssl rand -hex 32
+  ```
+  Store the result in `SESSION_SECRET` and reference it as `${SESSION_SECRET}` in the config.
+- **The redirect URI must match exactly.** Register `https://kafkaui.example.com/auth/callback` in
+  the GitLab application settings and use the same URL in `auth.oidc.redirect-url`.
+
+## See Also
+
+- [Roles and Permissions](roles-and-permissions.md)

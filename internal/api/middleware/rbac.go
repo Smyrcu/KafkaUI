@@ -31,6 +31,11 @@ func RequireAction(deps RBACDeps, action string, authEnabled bool) func(http.Han
 				return
 			}
 
+			if deps.Store == nil {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
+
 			cluster := chi.URLParam(r, "clusterName")
 			if cluster == "" {
 				cluster = "*"
@@ -47,7 +52,11 @@ func RequireAction(deps RBACDeps, action string, authEnabled bool) func(http.Han
 				Orgs:  user.Orgs,
 				Teams: user.Teams,
 			}
-			roles := auth.ResolveRoles(deps.Store, session.UserID, identity, deps.AutoRules, deps.DefaultRole)
+			roles, err := auth.ResolveRoles(deps.Store, session.UserID, identity, deps.AutoRules, deps.DefaultRole)
+			if err != nil {
+				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				return
+			}
 
 			if !deps.RBAC.IsAllowed(roles, cluster, action) {
 				http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)

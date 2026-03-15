@@ -53,6 +53,11 @@ auth:
     secret: "${SESSION_SECRET}"
     max-age: 86400
 
+  storage:
+    path: "/data/kafkaui-users.db"   # writable path for the SQLite user store
+
+  default-role: viewer               # fallback role when no auto-assignment rule matches
+
   oauth2:
     redirect-url: "https://kafkaui.example.com/auth/callback"
 
@@ -126,3 +131,98 @@ team name visible in the GitHub URL: `github.com/orgs/my-org/teams/platform-team
 
 - The `redirect-url` in the KafkaUI config must exactly match the **Authorization callback URL**
   registered in the OAuth App settings.
+
+## Deployment
+
+### SQLite User Store
+
+KafkaUI stores user records and manually-assigned role overrides in a SQLite database. Set
+`auth.storage.path` to a writable path appropriate for your environment:
+
+```yaml
+auth:
+  storage:
+    path: "/data/kafkaui-users.db"
+```
+
+### Docker
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v kafkaui-data:/data \
+  -e SESSION_SECRET="$(openssl rand -hex 32)" \
+  -e GITHUB_CLIENT_ID="Iv1.your_client_id" \
+  -e GITHUB_CLIENT_SECRET="your_client_secret" \
+  -v /path/to/kafkaui.yaml:/etc/kafkaui/config.yaml \
+  ghcr.io/your-org/kafkaui:latest \
+  --config /etc/kafkaui/config.yaml
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the config to persist the user store across
+container restarts.
+
+### Helm
+
+Store credentials in a Kubernetes Secret:
+
+```bash
+kubectl create secret generic kafkaui-github \
+  --from-literal=SESSION_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=GITHUB_CLIENT_ID="Iv1.your_client_id" \
+  --from-literal=GITHUB_CLIENT_SECRET="your_client_secret"
+```
+
+In `values.yaml`:
+
+```yaml
+env:
+  - name: SESSION_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-github
+        key: SESSION_SECRET
+  - name: GITHUB_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-github
+        key: GITHUB_CLIENT_ID
+  - name: GITHUB_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: kafkaui-github
+        key: GITHUB_CLIENT_SECRET
+
+persistence:
+  enabled: true
+  mountPath: /data
+  size: 1Gi
+```
+
+Set `auth.storage.path: /data/kafkaui-users.db` in the KafkaUI config. If the pod has
+`readOnlyRootFilesystem: true`, this persistent volume is required.
+
+### Binary
+
+```bash
+SESSION_SECRET="$(openssl rand -hex 32)" \
+GITHUB_CLIENT_ID="Iv1.your_client_id" \
+GITHUB_CLIENT_SECRET="your_client_secret" \
+./kafkaui --config kafkaui.yaml
+```
+
+## Security
+
+- **Use HTTPS in production.** The OAuth callback URL must use `https://` — GitHub rejects `http://`
+  redirect URIs for non-localhost addresses.
+- **Generate a strong session secret:**
+  ```bash
+  openssl rand -hex 32
+  ```
+  Store the result in `SESSION_SECRET` and reference it as `${SESSION_SECRET}` in the config.
+- **The redirect URI must match exactly.** Register `https://kafkaui.example.com/auth/callback` in
+  the GitHub OAuth App settings and use the same URL in `auth.oauth2.redirect-url`.
+
+## See Also
+
+- [Roles and Permissions](roles-and-permissions.md)

@@ -159,7 +159,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	r.Route("/ws", func(r chi.Router) {
 		r.Use(middleware.Auth(deps.Sessions, deps.AuthEnabled))
-		r.Get("/clusters/{clusterName}/topics/{topicName}/live", liveTailHandler.Handle)
+		wsRBACDeps := middleware.RBACDeps{
+			RBAC: deps.RBAC, Store: deps.UserStore,
+			AutoRules: deps.AutoAssignment, DefaultRole: deps.DefaultRole,
+		}
+		r.With(middleware.RequireAction(wsRBACDeps, "view_messages", deps.AuthEnabled)).
+			Get("/clusters/{clusterName}/topics/{topicName}/live", liveTailHandler.Handle)
 	})
 
 	return r

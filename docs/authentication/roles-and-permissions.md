@@ -16,11 +16,13 @@ reference it by name.
 An **RBAC rule** connects a role name to a list of actions on a list of clusters:
 
 ```yaml
-rbac:
-  rules:
-    - role: viewer
-      clusters: ["*"]      # wildcard = all clusters
-      actions: [view]      # "view" expands via role-groups
+# Under auth: section in kafkaui.yaml
+auth:
+  rbac:
+    rules:
+      - role: viewer
+        clusters: ["*"]      # wildcard = all clusters
+        actions: [view]      # "view" expands via role-groups
 ```
 
 ## Built-in Role Groups
@@ -35,38 +37,40 @@ recommended starting point uses three groups that nest into each other:
 | `admin`| Everything in `edit` + `manage_users` + `manage_clusters` |
 
 ```yaml
-rbac:
-  role-groups:
-    view:
-      - view_dashboard
-      - view_brokers
-      - view_topics
-      - view_messages
-      - view_consumer_groups
-      - view_schemas
-      - view_connectors
-      - view_acls
-      - view_ksql
-      - view_kafka_users
+# Under auth: section in kafkaui.yaml
+auth:
+  rbac:
+    role-groups:
+      view:
+        - view_dashboard
+        - view_brokers
+        - view_topics
+        - view_messages
+        - view_consumer_groups
+        - view_schemas
+        - view_connectors
+        - view_acls
+        - view_ksql
+        - view_kafka_users
 
-    edit:
-      - view                      # includes all view_* actions
-      - create_topics
-      - delete_topics
-      - produce_messages
-      - create_schemas
-      - delete_schemas
-      - manage_connectors
-      - reset_consumer_groups
-      - create_acls
-      - delete_acls
-      - execute_ksql
-      - manage_kafka_users
+      edit:
+        - view                      # includes all view_* actions
+        - create_topics
+        - delete_topics
+        - produce_messages
+        - create_schemas
+        - delete_schemas
+        - manage_connectors
+        - reset_consumer_groups
+        - create_acls
+        - delete_acls
+        - execute_ksql
+        - manage_kafka_users
 
-    admin:
-      - edit                      # includes view + all mutating actions
-      - manage_users
-      - manage_clusters
+      admin:
+        - edit                      # includes view + all mutating actions
+        - manage_users
+        - manage_clusters
 ```
 
 Role groups can reference other role groups recursively. Circular references are detected and
@@ -106,23 +110,25 @@ individually.
 ## RBAC Rules
 
 ```yaml
-rbac:
-  rules:
-    - role: viewer
-      clusters: ["*"]
-      actions: [view]
+# Under auth: section in kafkaui.yaml
+auth:
+  rbac:
+    rules:
+      - role: viewer
+        clusters: ["*"]
+        actions: [view]
 
-    - role: editor
-      clusters: ["*"]
-      actions: [edit]
+      - role: editor
+        clusters: ["*"]
+        actions: [edit]
 
-    - role: prod-readonly
-      clusters: ["prod-eu", "prod-us"]   # restrict to specific clusters
-      actions: [view]
+      - role: prod-readonly
+        clusters: ["prod-eu", "prod-us"]   # restrict to specific clusters
+        actions: [view]
 
-    - role: admin
-      clusters: ["*"]
-      actions: ["*"]                     # wildcard grants all actions
+      - role: admin
+        clusters: ["*"]
+        actions: ["*"]                     # wildcard grants all actions
 ```
 
 `clusters` accepts a list of cluster names as defined in the top-level `clusters` config, or `"*"`
@@ -229,6 +235,30 @@ auth:
   default-role: ""   # users without a matching rule have no roles and cannot access anything
 ```
 
+## SQLite User Store (`auth.storage.path`)
+
+When authentication is enabled, KafkaUI creates a SQLite database to persist user records and
+manually-assigned roles. The default file name is `kafkaui-users.db` created in the **current
+working directory** of the process.
+
+```yaml
+auth:
+  storage:
+    path: "/data/kafkaui-users.db"   # absolute path recommended for predictability
+```
+
+### Important deployment notes
+
+- The directory containing the database file must be **writable** by the KafkaUI process.
+- If the file does not exist, KafkaUI creates it on first startup.
+- **Kubernetes with `readOnlyRootFilesystem: true`**: the default CWD path will fail. Mount a
+  writable `PersistentVolumeClaim` and set `auth.storage.path` to a path on that volume (e.g.
+  `/data/kafkaui-users.db`).
+- **Docker**: mount a host directory or named volume to preserve the database across container
+  restarts. Without a volume the database is lost when the container is removed.
+- **Binary**: the database is created in whatever directory you launch the binary from. Use an
+  absolute path in the config to make the location explicit and stable.
+
 ## Complete Example Configurations
 
 ### Read-Only Team
@@ -326,10 +356,39 @@ A superuser that can do everything including user and cluster management:
 
 ```yaml
 auth:
+  enabled: true
+  types: [oidc]
+
+  default-role: ""
+
   rbac:
     role-groups:
+      view:
+        - view_dashboard
+        - view_brokers
+        - view_topics
+        - view_messages
+        - view_consumer_groups
+        - view_schemas
+        - view_connectors
+        - view_acls
+        - view_ksql
+        - view_kafka_users
+      edit:
+        - view
+        - create_topics
+        - delete_topics
+        - produce_messages
+        - create_schemas
+        - delete_schemas
+        - manage_connectors
+        - reset_consumer_groups
+        - create_acls
+        - delete_acls
+        - execute_ksql
+        - manage_kafka_users
       admin:
-        - edit              # assumes edit is already defined
+        - edit
         - manage_users
         - manage_clusters
 
@@ -338,3 +397,26 @@ auth:
         clusters: ["*"]
         actions: ["*"]      # wildcard: current and future actions
 ```
+
+## Security Checklist
+
+- **Use HTTPS in production.** Session cookies are signed but not encrypted. Transmitting them over
+  plain HTTP allows session hijacking. Configure TLS at the reverse proxy level and set
+  `redirect-url` to an `https://` URL.
+- **Generate a strong session secret.** The session cookie is HMAC-signed with `auth.session.secret`.
+  Use at least 32 random bytes:
+  ```bash
+  openssl rand -hex 32
+  ```
+  Store the result in an environment variable and reference it as `${SESSION_SECRET}` in the config.
+  Never commit the raw secret to source control.
+- **Rotate the secret when compromised.** Changing the secret immediately invalidates all existing
+  sessions, forcing all users to log in again.
+
+## See Also
+
+- [Basic Authentication](basic-auth.md)
+- [GitHub OAuth](github.md)
+- [GitLab OIDC](gitlab.md)
+- [Google OIDC](google.md)
+- [Generic OIDC](oidc.md)
