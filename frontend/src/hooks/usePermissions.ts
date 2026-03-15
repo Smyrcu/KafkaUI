@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 export function usePermissions() {
   const { user } = useAuth();
   return useQuery<PermissionsResponse>({
-    queryKey: ["permissions"],
+    queryKey: ["permissions", user?.email],
     queryFn: () => api.auth.permissions(),
     enabled: user?.authenticated === true,
     staleTime: 30_000,

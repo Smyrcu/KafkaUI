@@ -5,11 +5,15 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+// ErrUserNotFound is returned by DeleteUser when the target ID does not exist.
+var ErrUserNotFound = errors.New("user not found")
 
 // UserStore persists user accounts and role assignments in a SQLite database.
 type UserStore struct {
@@ -41,6 +45,15 @@ func NewUserStore(dbPath string) (*UserStore, error) {
 	if _, err := db.Exec("PRAGMA foreign_keys=ON"); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("enabling foreign keys: %w", err)
+	}
+
+	// Wait up to 5 seconds when the database is locked by another writer,
+	// rather than immediately returning SQLITE_BUSY. This is important even
+	// with MaxOpenConns(1) as the lock can be held briefly by WAL checkpoints
+	// or by a second process opening the same file (e.g. during rolling restarts).
+	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("setting busy timeout: %w", err)
 	}
 
 	s := &UserStore{db: db}
@@ -95,6 +108,12 @@ func generateID() (string, error) {
 // UpsertUser inserts a new user if none exists for the provider+externalID pair,
 // or updates the existing record (name, email, avatar, orgs, teams, last_login).
 // Returns the current User record and a bool indicating whether it was newly created.
+//
+// A single atomic INSERT … ON CONFLICT … DO UPDATE is used so that concurrent
+// logins never race between a SELECT and a subsequent INSERT or UPDATE.
+// The created bool is derived from the RETURNING values: for a new row
+// created_at equals last_login (both set to now); for an existing row
+// created_at predates last_login.
 func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -107,56 +126,39 @@ func (s *UserStore) UpsertUser(identity *UserIdentity) (*User, bool, error) {
 		return nil, false, fmt.Errorf("marshalling teams: %w", err)
 	}
 
-	existing, err := s.GetUserByProvider(identity.ProviderName, identity.ExternalID)
-	if err == nil {
-		// User exists — update mutable fields.
-		_, err = s.db.Exec(`
-			UPDATE users SET
-				email      = ?,
-				name       = ?,
-				avatar_url = ?,
-				orgs       = ?,
-				teams      = ?,
-				last_login = ?
-			WHERE provider_name = ? AND external_id = ?`,
-			identity.Email, identity.Name, identity.AvatarURL,
-			string(orgsJSON), string(teamsJSON), now,
-			identity.ProviderName, identity.ExternalID,
-		)
-		if err != nil {
-			return nil, false, fmt.Errorf("updating user: %w", err)
-		}
-
-		updated, err := s.GetUser(existing.ID)
-		if err != nil {
-			return nil, false, err
-		}
-		return updated, false, nil
-	}
-
-	// New user — insert.
 	id, err := generateID()
 	if err != nil {
 		return nil, false, err
 	}
 
-	_, err = s.db.Exec(`
-		INSERT INTO users
-			(id, provider_name, external_id, email, name, avatar_url, orgs, teams, last_login, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	var returnedID, returnedCreatedAt string
+	err = s.db.QueryRow(`
+		INSERT INTO users (id, provider_name, external_id, email, name, avatar_url, orgs, teams, last_login, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(provider_name, external_id) DO UPDATE SET
+			email      = excluded.email,
+			name       = excluded.name,
+			avatar_url = excluded.avatar_url,
+			orgs       = excluded.orgs,
+			teams      = excluded.teams,
+			last_login = excluded.last_login
+		RETURNING id, created_at`,
 		id, identity.ProviderName, identity.ExternalID,
 		identity.Email, identity.Name, identity.AvatarURL,
 		string(orgsJSON), string(teamsJSON), now, now,
-	)
+	).Scan(&returnedID, &returnedCreatedAt)
 	if err != nil {
-		return nil, false, fmt.Errorf("inserting user: %w", err)
+		return nil, false, fmt.Errorf("upserting user: %w", err)
 	}
 
-	user, err := s.GetUser(id)
+	// For a new row created_at == now; for an existing row created_at predates now.
+	created := returnedCreatedAt == now
+
+	user, err := s.GetUser(returnedID)
 	if err != nil {
 		return nil, false, err
 	}
-	return user, true, nil
+	return user, created, nil
 }
 
 // GetUser returns the User with the given ID, including their roles.
@@ -244,6 +246,7 @@ func (s *UserStore) ListUsers() ([]User, error) {
 }
 
 // DeleteUser removes the user and all their role assignments (cascade).
+// Returns ErrUserNotFound (via errors.Is) when no row matched the given ID.
 func (s *UserStore) DeleteUser(id string) error {
 	res, err := s.db.Exec(`DELETE FROM users WHERE id = ?`, id)
 	if err != nil {
@@ -251,7 +254,7 @@ func (s *UserStore) DeleteUser(id string) error {
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
-		return fmt.Errorf("user %s not found", id)
+		return fmt.Errorf("deleting user %s: %w", id, ErrUserNotFound)
 	}
 	return nil
 }

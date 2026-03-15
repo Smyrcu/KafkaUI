@@ -384,10 +384,10 @@ export const api = {
     testConnection: (data: AddClusterRequest) =>
       request<TestConnectionResult>('/admin/clusters/test', { method: 'POST', body: JSON.stringify(data) }),
     listUsers: () => request<AdminUser[]>('/admin/users'),
-    getUser: (id: string) => request<AdminUser>(`/admin/users/${id}`),
+    getUser: (id: string) => request<AdminUser>(`/admin/users/${encodeURIComponent(id)}`),
     setUserRoles: (id: string, data: SetRolesRequest) =>
-      request<{ status: string }>(`/admin/users/${id}/roles`, { method: 'PUT', body: JSON.stringify(data) }),
+      request<{ status: string }>(`/admin/users/${encodeURIComponent(id)}/roles`, { method: 'PUT', body: JSON.stringify(data) }),
     deleteUser: (id: string) =>
-      request<{ status: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
+      request<{ status: string }>(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
 };

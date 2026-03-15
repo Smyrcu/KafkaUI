@@ -22,6 +22,12 @@ type SessionManager struct {
 }
 
 // SessionData holds the user information stored within the session cookie.
+//
+// Security note: session data is HMAC-SHA256 signed (tamper-proof) but NOT
+// encrypted — the JSON payload is base64url-encoded and therefore readable
+// by anyone who can access the cookie value. The current fields (UserID,
+// Email, Name) are not considered sensitive, but any future additions that
+// carry secret information should encrypt the payload before signing.
 type SessionData struct {
 	UserID    string `json:"user_id"`
 	Email     string `json:"email"`

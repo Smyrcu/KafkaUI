@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -162,9 +164,17 @@ func (h *AuthHandler) LoginProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	randomPart := generateState()
+	randomPart, err := generateState()
+	if err != nil {
+		writeInternalError(w, "generating state", err)
+		return
+	}
 	state := randomPart + ":" + providerName
-	nonce := generateState()
+	nonce, err := generateState()
+	if err != nil {
+		writeInternalError(w, "generating nonce", err)
+		return
+	}
 
 	secure := auth.IsSecureRequest(r)
 	maxAge := int(5 * time.Minute / time.Second)
@@ -212,7 +222,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if cookie.Value != state {
+	if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state)) == 0 {
 		writeError(w, http.StatusBadRequest, "state mismatch")
 		return
 	}
@@ -238,12 +248,16 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedNonce := nonceCookie.Value
 
+	secure := auth.IsSecureRequest(r)
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -252,6 +266,8 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
 	})
 
 	identity, err := provider.Exchange(r.Context(), code, expectedNonce)
@@ -420,10 +436,10 @@ func (h *AuthHandler) upsertAndResolve(identity *auth.UserIdentity) (*auth.User,
 	return user, roles, nil
 }
 
-func generateState() string {
+func generateState() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
+		return "", fmt.Errorf("crypto/rand failed: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
