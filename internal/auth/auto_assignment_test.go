@@ -84,6 +84,40 @@ func TestAutoAssign_DomainMatch(t *testing.T) {
 	})
 }
 
+func TestAutoAssign_DomainMatch_WithoutAtPrefix(t *testing.T) {
+	// Config may omit the leading '@' — both forms must work.
+	rulesWithAt := []config.AutoAssignmentRule{
+		{Role: "staff", Match: config.AutoAssignmentMatch{EmailDomains: []string{"@company.com"}}},
+	}
+	rulesWithout := []config.AutoAssignmentRule{
+		{Role: "staff", Match: config.AutoAssignmentMatch{EmailDomains: []string{"company.com"}}},
+	}
+
+	t.Run("config with @ matches correctly", func(t *testing.T) {
+		identity := &UserIdentity{Email: "user@company.com"}
+		if roles := AutoAssign(rulesWithAt, identity); len(roles) != 1 {
+			t.Errorf("expected [staff], got %v", roles)
+		}
+	})
+
+	t.Run("config without @ matches correctly", func(t *testing.T) {
+		identity := &UserIdentity{Email: "user@company.com"}
+		if roles := AutoAssign(rulesWithout, identity); len(roles) != 1 {
+			t.Errorf("expected [staff], got %v", roles)
+		}
+	})
+
+	// Privilege escalation: evil@notcompany.com must NOT match company.com.
+	t.Run("suffix-only domain must not match (privilege escalation)", func(t *testing.T) {
+		identity := &UserIdentity{Email: "evil@notcompany.com"}
+		for _, rules := range [][]config.AutoAssignmentRule{rulesWithAt, rulesWithout} {
+			if roles := AutoAssign(rules, identity); len(roles) != 0 {
+				t.Errorf("evil@notcompany.com must not match company.com, got %v", roles)
+			}
+		}
+	})
+}
+
 func TestAutoAssign_GitHubOrgMatch(t *testing.T) {
 	rules := []config.AutoAssignmentRule{
 		{Role: "engineer", Match: config.AutoAssignmentMatch{GitHubOrgs: []string{"my-org"}}},

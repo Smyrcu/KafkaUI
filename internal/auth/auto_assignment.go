@@ -45,10 +45,16 @@ func matchesRule(match config.AutoAssignmentMatch, identity *UserIdentity) bool 
 	}
 	if len(match.EmailDomains) > 0 {
 		conditions++
-		for _, d := range match.EmailDomains {
-			if strings.HasSuffix(strings.ToLower(identity.Email), strings.ToLower(d)) {
-				matched++
-				break
+		emailParts := strings.SplitN(identity.Email, "@", 2)
+		if len(emailParts) == 2 {
+			emailDomain := strings.ToLower(emailParts[1])
+			for _, d := range match.EmailDomains {
+				// Strip leading '@' from config domain before comparing.
+				configDomain := strings.ToLower(strings.TrimPrefix(d, "@"))
+				if emailDomain == configDomain {
+					matched++
+					break
+				}
 			}
 		}
 	}

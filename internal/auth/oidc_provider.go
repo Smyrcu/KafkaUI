@@ -61,15 +61,19 @@ func (p *OIDCProvider) Name() string { return p.name }
 func (p *OIDCProvider) Type() string { return "oidc" }
 
 // AuthCodeURL returns the URL to redirect the user to for OIDC authorization.
-// The state parameter is an opaque value used to prevent CSRF attacks.
-func (p *OIDCProvider) AuthCodeURL(state string) string {
-	return p.oauth2Config.AuthCodeURL(state)
+// state is an opaque CSRF-prevention value; nonce is embedded in the
+// authorization request so the IdP echoes it back inside the ID token,
+// allowing the callback to detect replayed tokens.
+func (p *OIDCProvider) AuthCodeURL(state, nonce string) string {
+	return p.oauth2Config.AuthCodeURL(state, oauth2.SetAuthURLParam("nonce", nonce))
 }
 
 // Exchange trades an authorization code for an OAuth2 token, then extracts
 // and verifies the embedded OIDC ID token. It returns the normalized
 // UserIdentity and any error encountered.
-func (p *OIDCProvider) Exchange(ctx context.Context, code string) (*UserIdentity, error) {
+// expectedNonce must match the nonce claim inside the ID token; a mismatch
+// indicates a replayed or tampered token and causes an error.
+func (p *OIDCProvider) Exchange(ctx context.Context, code, expectedNonce string) (*UserIdentity, error) {
 	token, err := p.oauth2Config.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("exchanging auth code for token: %w", err)
@@ -85,6 +89,10 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code string) (*UserIdentity
 		return nil, fmt.Errorf("verifying ID token: %w", err)
 	}
 
+	if idToken.Nonce != expectedNonce {
+		return nil, fmt.Errorf("nonce mismatch: possible token replay attack")
+	}
+
 	return extractIdentity(idToken, p.name)
 }
 
@@ -94,13 +102,14 @@ func (p *OIDCProvider) Exchange(ctx context.Context, code string) (*UserIdentity
 // others use groups).
 func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity, error) {
 	var claims struct {
-		Subject string   `json:"sub"`
-		Email   string   `json:"email"`
-		Name    string   `json:"name"`
-		Picture string   `json:"picture"`
-		Roles   []string `json:"roles"`
-		Groups  []string `json:"groups"`
-		RealmAccess struct {
+		Subject       string   `json:"sub"`
+		Email         string   `json:"email"`
+		EmailVerified *bool    `json:"email_verified"`
+		Name          string   `json:"name"`
+		Picture       string   `json:"picture"`
+		Roles         []string `json:"roles"`
+		Groups        []string `json:"groups"`
+		RealmAccess   struct {
 			Roles []string `json:"roles"`
 		} `json:"realm_access"`
 	}
@@ -109,11 +118,18 @@ func extractIdentity(idToken *oidc.IDToken, providerName string) (*UserIdentity,
 		return nil, fmt.Errorf("extracting claims from ID token: %w", err)
 	}
 
+	// Only trust an email that is explicitly verified. If the claim is present
+	// and set to false, clear the email so it cannot match auto-assignment rules.
+	email := claims.Email
+	if claims.EmailVerified != nil && !*claims.EmailVerified {
+		email = ""
+	}
+
 	identity := &UserIdentity{
 		ProviderName: providerName,
 		ProviderType: "oidc",
 		ExternalID:   claims.Subject,
-		Email:        claims.Email,
+		Email:        email,
 		Name:         claims.Name,
 		AvatarURL:    claims.Picture,
 	}

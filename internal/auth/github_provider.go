@@ -69,14 +69,18 @@ func (p *GitHubProvider) Name() string { return p.name }
 func (p *GitHubProvider) Type() string { return "oauth2" }
 
 // AuthCodeURL returns the GitHub authorization redirect URL for the given state.
-func (p *GitHubProvider) AuthCodeURL(state string) string {
+// nonce is accepted to satisfy the IdentityProvider interface but is not used
+// because GitHub OAuth2 does not issue ID tokens with a nonce claim.
+func (p *GitHubProvider) AuthCodeURL(state, _ string) string {
 	return p.oauth2Config.AuthCodeURL(state)
 }
 
 // Exchange trades the authorization code for an access token, then fetches
 // the user's profile, primary email, organization memberships, and team
 // memberships from the GitHub API.
-func (p *GitHubProvider) Exchange(ctx context.Context, code string) (*UserIdentity, error) {
+// expectedNonce is accepted to satisfy the IdentityProvider interface but is
+// not verified because GitHub OAuth2 does not issue OIDC ID tokens.
+func (p *GitHubProvider) Exchange(ctx context.Context, code, _ string) (*UserIdentity, error) {
 	token, err := p.oauth2Config.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("exchanging GitHub auth code: %w", err)
@@ -143,10 +147,7 @@ func (p *GitHubProvider) fetchPrimaryEmail(client *http.Client) (string, error) 
 			return e.Email, nil
 		}
 	}
-	if len(emails) > 0 {
-		return emails[0].Email, nil
-	}
-	return "", fmt.Errorf("no email found")
+	return "", fmt.Errorf("no verified primary email found on GitHub account")
 }
 
 func (p *GitHubProvider) fetchOrgs(client *http.Client) ([]string, error) {
