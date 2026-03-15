@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Smyrcu/KafkaUI/internal/auth"
+	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
@@ -316,6 +317,29 @@ func (h *AuthHandler) Status(w http.ResponseWriter, r *http.Request) {
 		"enabled":   h.enabled,
 		"types":     types,
 		"providers": providers,
+	})
+}
+
+func (h *AuthHandler) Permissions(w http.ResponseWriter, r *http.Request) {
+	session, ok := r.Context().Value(middleware.UserContextKey).(*auth.SessionData)
+	if !ok || session == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"actions": []string{}, "clusters": []string{}})
+		return
+	}
+
+	user, err := h.userStore.GetUser(session.UserID)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"actions": []string{}, "clusters": []string{}})
+		return
+	}
+
+	identity := &auth.UserIdentity{Email: user.Email, Orgs: user.Orgs, Teams: user.Teams}
+	roles := auth.ResolveRoles(h.userStore, session.UserID, identity, h.autoRules, h.defaultRole)
+	actions := h.rbac.ExpandedActions(roles, "*")
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"actions":  actions,
+		"clusters": []string{"*"},
 	})
 }
 

@@ -41,6 +41,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger)
 
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
+	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore)
 	healthHandler := handlers.NewHealthHandler(deps.Registry)
 
 	authHandler := handlers.NewAuthHandler(handlers.AuthHandlerDeps{
@@ -79,12 +80,22 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/auth/callback", authHandler.Callback)
 		r.Get("/auth/me", authHandler.Me)
 		r.Post("/auth/logout", authHandler.Logout)
+		r.Get("/auth/permissions", authHandler.Permissions)
 
 		// Protected API routes
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(deps.Sessions, deps.AuthEnabled))
 
-			r.Get("/dashboard", dashboardHandler.Overview)
+			// Helper closure for RBAC middleware
+			rbacDeps := middleware.RBACDeps{
+				RBAC: deps.RBAC, Store: deps.UserStore,
+				AutoRules: deps.AutoAssignment, DefaultRole: deps.DefaultRole,
+			}
+			requireAction := func(action string) func(http.Handler) http.Handler {
+				return middleware.RequireAction(rbacDeps, action, deps.AuthEnabled)
+			}
+
+			r.With(requireAction("view_dashboard")).Get("/dashboard", dashboardHandler.Overview)
 			r.Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
@@ -94,50 +105,54 @@ func NewRouter(deps RouterDeps) http.Handler {
 				r.Post("/clusters/test", adminHandler.TestConnection)
 				r.Put("/clusters/{name}", adminHandler.UpdateCluster)
 				r.Delete("/clusters/{name}", adminHandler.DeleteCluster)
+				r.Get("/users", adminUsersHandler.List)
+				r.Get("/users/{id}", adminUsersHandler.Get)
+				r.Put("/users/{id}/roles", adminUsersHandler.SetRoles)
+				r.Delete("/users/{id}", adminUsersHandler.Delete)
 			})
 
 			r.Route("/clusters/{clusterName}", func(r chi.Router) {
-				r.Get("/overview", dashboardHandler.ClusterOverviewDetail)
-				r.Get("/brokers", brokerHandler.List)
+				r.With(requireAction("view_dashboard")).Get("/overview", dashboardHandler.ClusterOverviewDetail)
+				r.With(requireAction("view_brokers")).Get("/brokers", brokerHandler.List)
 
-				r.Get("/topics", topicHandler.List)
-				r.Post("/topics", topicHandler.Create)
-				r.Get("/topics/{topicName}", topicHandler.Details)
-				r.Delete("/topics/{topicName}", topicHandler.Delete)
+				r.With(requireAction("view_topics")).Get("/topics", topicHandler.List)
+				r.With(requireAction("create_topics")).Post("/topics", topicHandler.Create)
+				r.With(requireAction("view_topics")).Get("/topics/{topicName}", topicHandler.Details)
+				r.With(requireAction("delete_topics")).Delete("/topics/{topicName}", topicHandler.Delete)
 
-				r.Get("/topics/{topicName}/messages", messageHandler.Browse)
-				r.Post("/topics/{topicName}/messages", messageHandler.Produce)
+				r.With(requireAction("view_messages")).Get("/topics/{topicName}/messages", messageHandler.Browse)
+				r.With(requireAction("produce_messages")).Post("/topics/{topicName}/messages", messageHandler.Produce)
 
-				r.Get("/consumer-groups", consumerGroupHandler.List)
-				r.Get("/consumer-groups/{groupName}", consumerGroupHandler.Details)
-				r.Post("/consumer-groups/{groupName}/reset", consumerGroupHandler.ResetOffsets)
+				r.With(requireAction("view_consumer_groups")).Get("/consumer-groups", consumerGroupHandler.List)
+				r.With(requireAction("view_consumer_groups")).Get("/consumer-groups/{groupName}", consumerGroupHandler.Details)
+				r.With(requireAction("reset_consumer_groups")).Post("/consumer-groups/{groupName}/reset", consumerGroupHandler.ResetOffsets)
 
-				r.Get("/schemas", schemaHandler.List)
-				r.Post("/schemas", schemaHandler.Create)
-				r.Get("/schemas/{subject}", schemaHandler.Details)
-				r.Delete("/schemas/{subject}", schemaHandler.Delete)
+				r.With(requireAction("view_schemas")).Get("/schemas", schemaHandler.List)
+				r.With(requireAction("create_schemas")).Post("/schemas", schemaHandler.Create)
+				r.With(requireAction("view_schemas")).Get("/schemas/{subject}", schemaHandler.Details)
+				r.With(requireAction("delete_schemas")).Delete("/schemas/{subject}", schemaHandler.Delete)
 
-				r.Get("/connectors", connectHandler.List)
-				r.Post("/connectors", connectHandler.Create)
-				r.Get("/connectors/{connectorName}", connectHandler.Details)
-				r.Put("/connectors/{connectorName}", connectHandler.Update)
-				r.Delete("/connectors/{connectorName}", connectHandler.Delete)
-				r.Post("/connectors/{connectorName}/restart", connectHandler.Restart)
-				r.Post("/connectors/{connectorName}/pause", connectHandler.Pause)
-				r.Post("/connectors/{connectorName}/resume", connectHandler.Resume)
+				r.With(requireAction("view_connectors")).Get("/connectors", connectHandler.List)
+				r.With(requireAction("manage_connectors")).Post("/connectors", connectHandler.Create)
+				r.With(requireAction("view_connectors")).Get("/connectors/{connectorName}", connectHandler.Details)
+				r.With(requireAction("manage_connectors")).Put("/connectors/{connectorName}", connectHandler.Update)
+				r.With(requireAction("manage_connectors")).Delete("/connectors/{connectorName}", connectHandler.Delete)
+				r.With(requireAction("manage_connectors")).Post("/connectors/{connectorName}/restart", connectHandler.Restart)
+				r.With(requireAction("manage_connectors")).Post("/connectors/{connectorName}/pause", connectHandler.Pause)
+				r.With(requireAction("manage_connectors")).Post("/connectors/{connectorName}/resume", connectHandler.Resume)
 
-				r.Post("/ksql", ksqlHandler.Execute)
-				r.Get("/ksql/info", ksqlHandler.Info)
+				r.With(requireAction("execute_ksql")).Post("/ksql", ksqlHandler.Execute)
+				r.With(requireAction("view_ksql")).Get("/ksql/info", ksqlHandler.Info)
 
-				r.Get("/acls", aclHandler.List)
-				r.Post("/acls", aclHandler.Create)
-				r.Post("/acls/delete", aclHandler.Delete)
+				r.With(requireAction("view_acls")).Get("/acls", aclHandler.List)
+				r.With(requireAction("create_acls")).Post("/acls", aclHandler.Create)
+				r.With(requireAction("delete_acls")).Post("/acls/delete", aclHandler.Delete)
 
-				r.Get("/users", userHandler.List)
-				r.Post("/users", userHandler.Create)
-				r.Post("/users/delete", userHandler.Delete)
+				r.With(requireAction("view_kafka_users")).Get("/users", userHandler.List)
+				r.With(requireAction("manage_kafka_users")).Post("/users", userHandler.Create)
+				r.With(requireAction("manage_kafka_users")).Post("/users/delete", userHandler.Delete)
 
-				r.Get("/metrics", metricsHandler.Metrics)
+				r.With(requireAction("view_dashboard")).Get("/metrics", metricsHandler.Metrics)
 			})
 		})
 	})
