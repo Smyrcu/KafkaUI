@@ -17,33 +17,44 @@ const cookieName = "kafkaui_session"
 // SessionManager handles cookie-based session management using HMAC-SHA256 signed cookies.
 // No external session store is required — the session data is stored directly in the signed cookie.
 type SessionManager struct {
-	secret []byte
-	maxAge int
+	secret     []byte
+	maxAge     int
+	trustProxy bool
 }
 
 // SessionData holds the user information stored within the session cookie.
+//
+// Security note: session data is HMAC-SHA256 signed (tamper-proof) but NOT
+// encrypted — the JSON payload is base64url-encoded and therefore readable
+// by anyone who can access the cookie value. The current fields (UserID,
+// Email, Name) are not considered sensitive, but any future additions that
+// carry secret information should encrypt the payload before signing.
 type SessionData struct {
-	Token     string   `json:"token"`
-	Email     string   `json:"email"`
-	Name      string   `json:"name"`
-	Roles     []string `json:"roles"`
-	CreatedAt int64    `json:"created_at"`
+	UserID    string `json:"user_id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 // NewSessionManager creates a new SessionManager with the given secret and maximum age in seconds.
-// If maxAge is 0, it defaults to 86400 (24 hours).
-func NewSessionManager(secret string, maxAge int) *SessionManager {
+// If maxAge is 0, it defaults to 86400 (24 hours). The secret must be at least 32 characters.
+func NewSessionManager(secret string, maxAge int, trustProxy bool) (*SessionManager, error) {
+	if len(secret) < 32 {
+		return nil, fmt.Errorf("session secret must be at least 32 characters, got %d", len(secret))
+	}
 	if maxAge == 0 {
 		maxAge = 86400 // 24 hours
 	}
 	return &SessionManager{
-		secret: []byte(secret),
-		maxAge: maxAge,
-	}
+		secret:     []byte(secret),
+		maxAge:     maxAge,
+		trustProxy: trustProxy,
+	}, nil
 }
 
 // CreateSession encodes the SessionData as JSON, signs it with HMAC-SHA256, and sets it as
-// an HTTP-only cookie. The cookie is Secure when the request origin is not localhost.
+// an HTTP-only cookie. The cookie is Secure when the request arrives over HTTPS (direct TLS
+// or X-Forwarded-Proto: https); it is not Secure on localhost so local development works.
 func (sm *SessionManager) CreateSession(w http.ResponseWriter, r *http.Request, data SessionData) error {
 	data.CreatedAt = time.Now().Unix()
 	jsonData, err := json.Marshal(data)
@@ -53,7 +64,7 @@ func (sm *SessionManager) CreateSession(w http.ResponseWriter, r *http.Request, 
 
 	signed := sm.sign(jsonData)
 
-	secure := !isLocalhost(r)
+	secure := IsSecureRequest(r, sm.trustProxy)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
@@ -96,7 +107,7 @@ func (sm *SessionManager) GetSession(r *http.Request) (*SessionData, error) {
 
 // ClearSession removes the session by setting an expired cookie.
 func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) {
-	secure := !isLocalhost(r)
+	secure := IsSecureRequest(r, sm.trustProxy)
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
@@ -148,6 +159,20 @@ func (sm *SessionManager) verify(signed []byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// IsSecureRequest returns true when the request arrives over HTTPS — either
+// because the connection itself is TLS, or because a trusted proxy has set
+// X-Forwarded-Proto: https (only when trustProxy is true). Localhost origins
+// are treated as non-secure so that local development works without TLS certificates.
+func IsSecureRequest(r *http.Request, trustProxy bool) bool {
+	if isLocalhost(r) {
+		return false
+	}
+	if trustProxy && r.Header.Get("X-Forwarded-Proto") == "https" {
+		return true
+	}
+	return r.TLS != nil
 }
 
 // isLocalhost returns true if the request originates from a localhost address.

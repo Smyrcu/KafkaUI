@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { useHasAction } from "@/hooks/usePermissions";
 import { api, type ResetOffsetsRequest } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +22,7 @@ import { getErrorMessage } from "@/lib/error-utils";
 export function ConsumerGroupDetailPage() {
   const { clusterName, groupName } = useParams<{ clusterName: string; groupName: string }>();
   const queryClient = useQueryClient();
+  const canResetOffsets = useHasAction("reset_consumer_groups");
   const [resetOpen, setResetOpen] = useState(false);
   const [resetTopic, setResetTopic] = useState("");
   const [resetTo, setResetTo] = useState("earliest");
@@ -64,6 +66,7 @@ export function ConsumerGroupDetailPage() {
             <Badge variant={group.state === "Stable" ? "success" : group.state === "Empty" ? "secondary" : "destructive"}>
               {group.state}
             </Badge>
+            {canResetOffsets && (
             <Dialog open={resetOpen} onOpenChange={setResetOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -115,6 +118,7 @@ export function ConsumerGroupDetailPage() {
                 )}
               </DialogContent>
             </Dialog>
+            )}
           </div>
         }
       />

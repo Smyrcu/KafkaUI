@@ -16,6 +16,7 @@ import { TableSkeleton } from "@/components/PageSkeleton";
 import { useSearchFilter } from "@/hooks/useSearchFilter";
 import { UserCog, Plus } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useHasAction } from "@/hooks/usePermissions";
 
 interface ScramUser {
   name: string;
@@ -35,6 +36,7 @@ const initialForm = {
 export function UsersPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
+  const canManageUsers = useHasAction("manage_kafka_users");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ScramUser | null>(null);
   const userAccessor = useCallback((user: ScramUser) => user.name, []);
@@ -102,7 +104,7 @@ export function UsersPage() {
         title="Users"
         description={`SCRAM credentials for ${clusterName}`}
         breadcrumbs={breadcrumbs}
-        actions={
+        actions={canManageUsers ? (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Create User</Button>
@@ -160,7 +162,7 @@ export function UsersPage() {
               </div>
             </DialogContent>
           </Dialog>
-        }
+        ) : undefined}
       />
       <div className="mb-4">
         <Input
@@ -171,7 +173,7 @@ export function UsersPage() {
         />
       </div>
       {filteredUsers.length === 0 ? (
-        <EmptyState icon={UserCog} title="No SCRAM users found" description={search ? "No users match your search." : "No SCRAM credentials configured yet."} actionLabel={!search ? "Create User" : undefined} onAction={!search ? () => setDialogOpen(true) : undefined} />
+        <EmptyState icon={UserCog} title="No SCRAM users found" description={search ? "No users match your search." : "No SCRAM credentials configured yet."} actionLabel={!search && canManageUsers ? "Create User" : undefined} onAction={!search && canManageUsers ? () => setDialogOpen(true) : undefined} />
       ) : (
         <DataTable<ScramUser>
           itemName="users"
@@ -185,11 +187,11 @@ export function UsersPage() {
             { header: "Iterations", accessorKey: "iterations" },
             {
               header: "Actions",
-              cell: (user) => (
+              cell: (user) => canManageUsers ? (
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(user)} disabled={deleteMutation.isPending}>
                   Delete
                 </Button>
-              ),
+              ) : null,
             },
           ]}
         />

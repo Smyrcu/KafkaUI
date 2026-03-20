@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api, type CreateTopicRequest } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,8 @@ import type { TopicInfo } from "@/lib/api";
 export function TopicsPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
+  const canCreateTopics = useHasAction("create_topics");
+  const canDeleteTopics = useHasAction("delete_topics");
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState<CreateTopicRequest>({ name: "", partitions: 1, replicas: 1 });
@@ -63,7 +66,7 @@ export function TopicsPage() {
         title="Topics"
         description={`Manage topics in ${clusterName}`}
         breadcrumbs={breadcrumbs}
-        actions={
+        actions={canCreateTopics ? (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Create Topic</Button>
@@ -94,13 +97,13 @@ export function TopicsPage() {
               {createMutation.isError && <p className="text-sm text-destructive mt-2">{getErrorMessage(createMutation.error)}</p>}
             </DialogContent>
           </Dialog>
-        }
+        ) : undefined}
       />
       <div className="mb-4">
         <Input placeholder="Search topics..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       </div>
       {filteredTopics.length === 0 ? (
-        <EmptyState icon={FileText} title="No topics found" description={search ? "No topics match your search." : "This cluster has no topics yet."} actionLabel={!search ? "Create Topic" : undefined} onAction={!search ? () => setOpen(true) : undefined} />
+        <EmptyState icon={FileText} title="No topics found" description={search ? "No topics match your search." : "This cluster has no topics yet."} actionLabel={!search && canCreateTopics ? "Create Topic" : undefined} onAction={!search && canCreateTopics ? () => setOpen(true) : undefined} />
       ) : (
         <DataTable<TopicInfo>
           itemName="topics"
@@ -110,7 +113,7 @@ export function TopicsPage() {
             { header: "Partitions", accessorKey: "partitions" },
             { header: "Replicas", accessorKey: "replicas" },
             { header: "Internal", cell: (t) => t.internal ? <Badge variant="secondary">internal</Badge> : null },
-            { header: "Actions", className: "w-[80px]", cell: (t) => !t.internal ? (
+            { header: "Actions", className: "w-[80px]", cell: (t) => !t.internal && canDeleteTopics ? (
               <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteTarget(t.name); }}>
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>

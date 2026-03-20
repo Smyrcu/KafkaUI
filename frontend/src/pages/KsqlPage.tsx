@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { useHasAction } from "@/hooks/usePermissions";
 import { api, type KsqlResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,7 @@ function formatResultData(data: unknown): string {
 
 export function KsqlPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
+  const canExecuteKsql = useHasAction("execute_ksql");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<KsqlResponse | null>(null);
 
@@ -52,18 +54,20 @@ export function KsqlPage() {
         breadcrumbs={breadcrumbs}
       />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {quickActions.map((action) => (
-          <Button
-            key={action.label}
-            variant="outline"
-            size="sm"
-            onClick={() => setQuery(action.query)}
-          >
-            {action.label}
-          </Button>
-        ))}
-      </div>
+      {canExecuteKsql && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {quickActions.map((action) => (
+            <Button
+              key={action.label}
+              variant="outline"
+              size="sm"
+              onClick={() => setQuery(action.query)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-4">
         <Textarea
@@ -72,14 +76,19 @@ export function KsqlPage() {
           placeholder="Enter KSQL statement... (e.g., SHOW STREAMS;)"
           rows={12}
           className="font-mono"
+          disabled={!canExecuteKsql}
         />
 
-        <Button
-          onClick={() => executeMutation.mutate()}
-          disabled={executeMutation.isPending || !query.trim()}
-        >
-          {executeMutation.isPending ? "Executing..." : "Execute"}
-        </Button>
+        {canExecuteKsql ? (
+          <Button
+            onClick={() => executeMutation.mutate()}
+            disabled={executeMutation.isPending || !query.trim()}
+          >
+            {executeMutation.isPending ? "Executing..." : "Execute"}
+          </Button>
+        ) : (
+          <p className="text-sm text-muted-foreground">You do not have permission to execute KSQL queries.</p>
+        )}
       </div>
 
       {executeMutation.error && (

@@ -21,18 +21,24 @@ func TestBasicAuthenticator_ValidCredentials(t *testing.T) {
 		{Username: "admin", Password: hashPassword(t, "secret"), Roles: []string{"admin"}},
 	})
 
-	session, err := auth.Authenticate("admin", "secret")
+	identity, err := auth.Authenticate("admin", "secret")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if session.Name != "admin" {
-		t.Errorf("expected name 'admin', got %q", session.Name)
+	if identity.Name != "admin" {
+		t.Errorf("expected name 'admin', got %q", identity.Name)
 	}
-	if session.Email != "admin" {
-		t.Errorf("expected email 'admin', got %q", session.Email)
+	if identity.Email != "admin" {
+		t.Errorf("expected email 'admin', got %q", identity.Email)
 	}
-	if len(session.Roles) != 1 || session.Roles[0] != "admin" {
-		t.Errorf("expected roles [admin], got %v", session.Roles)
+	if identity.ProviderName != "basic" {
+		t.Errorf("expected providerName 'basic', got %q", identity.ProviderName)
+	}
+	if identity.ProviderType != "basic" {
+		t.Errorf("expected providerType 'basic', got %q", identity.ProviderType)
+	}
+	if identity.ExternalID != "admin" {
+		t.Errorf("expected externalID 'admin', got %q", identity.ExternalID)
 	}
 }
 
@@ -64,15 +70,15 @@ func TestBasicAuthenticator_MultipleUsers(t *testing.T) {
 		{Username: "viewer", Password: hashPassword(t, "viewerpass"), Roles: []string{"viewer"}},
 	})
 
-	session, err := auth.Authenticate("viewer", "viewerpass")
+	identity, err := auth.Authenticate("viewer", "viewerpass")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if session.Name != "viewer" {
-		t.Errorf("expected name 'viewer', got %q", session.Name)
+	if identity.Name != "viewer" {
+		t.Errorf("expected name 'viewer', got %q", identity.Name)
 	}
-	if len(session.Roles) != 1 || session.Roles[0] != "viewer" {
-		t.Errorf("expected roles [viewer], got %v", session.Roles)
+	if identity.ExternalID != "viewer" {
+		t.Errorf("expected externalID 'viewer', got %q", identity.ExternalID)
 	}
 }
 
@@ -83,4 +89,35 @@ func TestBasicAuthenticator_EmptyUsers(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error with no users configured")
 	}
+}
+
+func TestBasicAuthenticator_ConfigRoles(t *testing.T) {
+	a := NewBasicAuthenticator([]config.BasicUser{
+		{Username: "admin", Password: hashPassword(t, "secret"), Roles: []string{"admin", "operator"}},
+		{Username: "viewer", Password: hashPassword(t, "pass"), Roles: nil},
+	})
+
+	t.Run("user with roles returns them", func(t *testing.T) {
+		roles := a.ConfigRoles("admin")
+		if len(roles) != 2 {
+			t.Fatalf("expected 2 config roles, got %v", roles)
+		}
+		if roles[0] != "admin" || roles[1] != "operator" {
+			t.Errorf("unexpected roles: %v", roles)
+		}
+	})
+
+	t.Run("user without roles returns nil", func(t *testing.T) {
+		roles := a.ConfigRoles("viewer")
+		if len(roles) != 0 {
+			t.Errorf("expected no roles, got %v", roles)
+		}
+	})
+
+	t.Run("unknown user returns nil", func(t *testing.T) {
+		roles := a.ConfigRoles("nobody")
+		if roles != nil {
+			t.Errorf("expected nil for unknown user, got %v", roles)
+		}
+	})
 }

@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useHasAction } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ErrorAlert } from "@/components/ErrorAlert";
@@ -23,6 +24,8 @@ import type { SchemaSubjectInfo } from "@/lib/api";
 export function SchemaRegistryPage() {
   const { clusterName } = useParams<{ clusterName: string }>();
   const queryClient = useQueryClient();
+  const canCreateSchemas = useHasAction("create_schemas");
+  const canDeleteSchemas = useHasAction("delete_schemas");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const schemaAccessor = useCallback((s: SchemaSubjectInfo) => s.subject, []);
@@ -89,7 +92,7 @@ export function SchemaRegistryPage() {
         title="Schema Registry"
         description={`Manage schemas in ${clusterName}`}
         breadcrumbs={breadcrumbs}
-        actions={
+        actions={canCreateSchemas ? (
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="h-4 w-4 mr-2" />Create Schema</Button>
@@ -148,7 +151,7 @@ export function SchemaRegistryPage() {
               </form>
             </DialogContent>
           </Dialog>
-        }
+        ) : undefined}
       />
       <div className="mb-4">
         <Input
@@ -159,7 +162,7 @@ export function SchemaRegistryPage() {
         />
       </div>
       {filteredSchemas.length === 0 ? (
-        <EmptyState icon={BookOpen} title="No schemas found" description={search ? "No schemas match your search." : "No schemas registered yet."} actionLabel={!search ? "Create Schema" : undefined} onAction={!search ? () => setCreateOpen(true) : undefined} />
+        <EmptyState icon={BookOpen} title="No schemas found" description={search ? "No schemas match your search." : "No schemas registered yet."} actionLabel={!search && canCreateSchemas ? "Create Schema" : undefined} onAction={!search && canCreateSchemas ? () => setCreateOpen(true) : undefined} />
       ) : (
         <DataTable<SchemaSubjectInfo>
           itemName="schemas"
@@ -181,7 +184,7 @@ export function SchemaRegistryPage() {
             },
             {
               header: "Actions",
-              cell: (s) => (
+              cell: (s) => canDeleteSchemas ? (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -190,7 +193,7 @@ export function SchemaRegistryPage() {
                 >
                   Delete
                 </Button>
-              ),
+              ) : null,
             },
           ]}
         />

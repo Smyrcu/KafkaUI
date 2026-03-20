@@ -27,7 +27,9 @@ config.test-*.yaml
 !config.example.yaml
 
 # Internal docs (plans, notes, review artifacts)
-docs/
+docs/plans/
+docs/superpowers/
+docs/*.md
 
 # Dev environment artifacts
 dev/jmx-exporter/*.jar

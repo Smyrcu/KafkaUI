@@ -1,6 +1,7 @@
 import { useState, Fragment } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useHasAction } from "@/hooks/usePermissions";
 import { api, type BrowseParams, type ProduceRequest, type MessageRecord } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { TopicTabs } from "@/components/TopicTabs";
@@ -24,6 +25,7 @@ type OffsetMode = "latest" | "earliest" | "timestamp" | "custom";
 
 export function TopicMessagesPage() {
   const { clusterName, topicName } = useParams<{ clusterName: string; topicName: string }>();
+  const canProduceMessages = useHasAction("produce_messages");
 
   // Browse state
   const [partition, setPartition] = useState<string>("");
@@ -181,6 +183,7 @@ export function TopicMessagesPage() {
             <Download className="h-4 w-4 mr-2" />Download JSON
           </Button>
         )}
+        {canProduceMessages && (
         <div className="ml-auto">
           <Dialog open={produceOpen} onOpenChange={setProduceOpen}>
             <DialogTrigger asChild>
@@ -229,6 +232,7 @@ export function TopicMessagesPage() {
             </DialogContent>
           </Dialog>
         </div>
+        )}
       </div>
 
       {/* CEL Filter */}

@@ -89,22 +89,50 @@ func mergeDynamicClusters(cfg *config.Config, dynamicCfg *config.DynamicConfig, 
 	logger.Info("loaded dynamic clusters", "count", len(dynClusters))
 }
 
-// initOIDCProviders creates OIDC providers when auth types include "oidc".
-func initOIDCProviders(cfg *config.Config, logger *slog.Logger) (map[string]*auth.Provider, []config.OIDCProvider) {
-	if !cfg.Auth.Enabled || !slices.Contains(cfg.Auth.Types, "oidc") {
+// initProviders creates all external auth providers (OIDC + OAuth2) and
+// returns a unified map plus a list of provider info for the status endpoint.
+func initProviders(cfg *config.Config, logger *slog.Logger) (map[string]auth.IdentityProvider, []auth.ProviderInfo) {
+	if !cfg.Auth.Enabled {
 		return nil, nil
 	}
-	providers := make(map[string]*auth.Provider)
-	for _, p := range cfg.Auth.OIDC.Providers {
-		provider, err := auth.NewProvider(context.Background(), p, cfg.Auth.OIDC.RedirectURL)
-		if err != nil {
-			logger.Error("failed to create OIDC provider", "name", p.Name, "error", err)
-			os.Exit(1)
+
+	providers := make(map[string]auth.IdentityProvider)
+	var providerList []auth.ProviderInfo
+
+	// OIDC providers
+	if slices.Contains(cfg.Auth.Types, "oidc") {
+		for _, p := range cfg.Auth.OIDC.Providers {
+			provider, err := auth.NewOIDCProvider(context.Background(), p, cfg.Auth.OIDC.RedirectURL)
+			if err != nil {
+				logger.Error("failed to create OIDC provider", "name", p.Name, "error", err)
+				os.Exit(1)
+			}
+			providers[p.Name] = provider
+			providerList = append(providerList, auth.ProviderInfo{
+				Name:        p.Name,
+				DisplayName: p.DisplayName,
+				Type:        "oidc",
+			})
+			logger.Info("OIDC provider enabled", "name", p.Name, "issuer", p.Issuer)
 		}
-		providers[p.Name] = provider
-		logger.Info("OIDC provider enabled", "name", p.Name, "issuer", p.Issuer)
 	}
-	return providers, cfg.Auth.OIDC.Providers
+
+	// OAuth2 providers — currently only GitHub is supported.
+	// Generic OAuth2 (Gitea, Forgejo, etc.) would need dedicated provider implementations.
+	if slices.Contains(cfg.Auth.Types, "oauth2") {
+		for _, p := range cfg.Auth.OAuth2.Providers {
+			provider := auth.NewGitHubProvider(p, cfg.Auth.OAuth2.RedirectURL, "", logger)
+			providers[p.Name] = provider
+			providerList = append(providerList, auth.ProviderInfo{
+				Name:        p.Name,
+				DisplayName: p.DisplayName,
+				Type:        "oauth2",
+			})
+			logger.Info("OAuth2 provider enabled", "name", p.Name)
+		}
+	}
+
+	return providers, providerList
 }
 
 // initBasicAuth creates the basic authenticator and rate limiter when auth types include "basic".
@@ -186,12 +214,18 @@ func main() {
 
 	sessionSecret := cfg.Auth.Session.Secret
 	if sessionSecret == "" {
-		sessionSecret = "kafkaui-default-secret-change-me"
 		if cfg.Auth.Enabled {
-			logger.Warn("auth is enabled but no session secret configured — using insecure default. Set auth.session.secret or SESSION_SECRET env var")
+			logger.Error("auth is enabled but session.secret is not configured — refusing to start with a forgeable session secret. Set auth.session.secret or SESSION_SECRET env var")
+			os.Exit(1)
 		}
+		// Auth disabled: use a placeholder so SessionManager initialises without a blank key.
+		sessionSecret = "kafkaui-default-secret-change-me"
 	}
-	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
+	sessions, err := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge, cfg.Server.TrustProxy)
+	if err != nil {
+		logger.Error("failed to create session manager", "error", err)
+		os.Exit(1)
+	}
 
 	// Create masking engine (nil-safe; handlers skip masking when nil rules)
 	var maskingEngine *masking.Engine
@@ -200,7 +234,7 @@ func main() {
 		logger.Info("data masking enabled", "rules", len(cfg.DataMasking.Rules))
 	}
 
-	oidcProviders, oidcProviderCfg := initOIDCProviders(cfg, logger)
+	providers, providerList := initProviders(cfg, logger)
 	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
 	metricsCtx, metricsCancel := context.WithCancel(context.Background())
 	defer metricsCancel()
@@ -211,14 +245,34 @@ func main() {
 	}
 	metricsStore := initMetrics(metricsCtx, cfg, logger)
 
+	// Initialize user store for auth persistence
+	var userStore *auth.UserStore
+	var rbac *auth.RBAC
+	if cfg.Auth.Enabled {
+		storagePath := cfg.Auth.Storage.Path
+		if storagePath == "" {
+			storagePath = "kafkaui-users.db"
+		}
+		var err error
+		userStore, err = auth.NewUserStore(storagePath)
+		if err != nil {
+			logger.Error("failed to create user store", "error", err)
+			os.Exit(1)
+		}
+		defer userStore.Close()
+		logger.Info("user store initialized", "path", storagePath)
+
+		rbac = auth.NewRBAC(cfg.Auth.RBAC)
+	}
+
 	router := api.NewRouter(api.RouterDeps{
 		Registry:           registry,
 		Logger:             logger,
 		Sessions:           sessions,
 		AuthEnabled:        cfg.Auth.Enabled,
 		MaskingEngine:      maskingEngine,
-		OIDCProviders:      oidcProviders,
-		OIDCProviderCfg:    oidcProviderCfg,
+		Providers:          providers,
+		ProviderList:       providerList,
 		BasicAuth:          basicAuth,
 		RateLimiter:        rateLimiter,
 		AuthTypes:          cfg.Auth.Types,
@@ -226,6 +280,12 @@ func main() {
 		MockMetrics:        mockMetricsHandler,
 		DynamicCfg:         dynamicCfg,
 		StaticClusterNames: staticClusterNames,
+		UserStore:          userStore,
+		RBAC:               rbac,
+		AutoAssignment:     cfg.Auth.AutoAssignment,
+		DefaultRole:        cfg.Auth.DefaultRole,
+		TrustProxy:         cfg.Server.TrustProxy,
+		CORSOrigins:        cfg.Server.CORSOrigins,
 	})
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")
@@ -236,8 +296,9 @@ func main() {
 	spaHandler := newSPAHandler(http.FS(frontendContent))
 
 	mux := http.NewServeMux()
-	mux.Handle("/api/", router)
-	mux.Handle("/ws/", router)
+	apiTimeout := http.TimeoutHandler(router, 30*time.Second, `{"error":"request timeout"}`)
+	mux.Handle("/api/", apiTimeout)
+	mux.Handle("/ws/", router) // no timeout for WebSocket connections
 	mux.Handle("/debug/", router)
 	mux.Handle("/healthz", router)
 	mux.Handle("/readyz", router)

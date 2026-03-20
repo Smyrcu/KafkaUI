@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"slices"
 
@@ -11,6 +12,12 @@ import (
 type contextKey string
 
 const UserContextKey contextKey = "user"
+
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
 
 func Auth(sessions *auth.SessionManager, authEnabled bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -22,7 +29,7 @@ func Auth(sessions *auth.SessionManager, authEnabled bool) func(http.Handler) ht
 
 			session, err := sessions.GetSession(r)
 			if err != nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
@@ -35,7 +42,8 @@ func Auth(sessions *auth.SessionManager, authEnabled bool) func(http.Handler) ht
 
 // RequireRole returns middleware that restricts access to users with the given role.
 // When auth is disabled, all requests are allowed through.
-func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler {
+// Roles are resolved via auth.ResolveRoles (DB roles, auto-assignment, default role).
+func RequireRole(role string, authEnabled bool, deps RBACDeps) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !authEnabled {
@@ -45,12 +53,34 @@ func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler 
 
 			session, ok := r.Context().Value(UserContextKey).(*auth.SessionData)
 			if !ok || session == nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
-			if !slices.Contains(session.Roles, role) {
-				http.Error(w, `{"error":"forbidden: admin role required"}`, http.StatusForbidden)
+			if deps.Store == nil {
+				writeJSONError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+
+			user, err := deps.Store.GetUserBasic(session.UserID)
+			if err != nil {
+				writeJSONError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+			identity := &auth.UserIdentity{
+				ExternalID: user.ExternalID,
+				Email:      user.Email,
+				Orgs:       user.Orgs,
+				Teams:      user.Teams,
+			}
+			roles, err := auth.ResolveRoles(deps.Store, session.UserID, identity, deps.AutoRules, deps.DefaultRole)
+			if err != nil {
+				writeJSONError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+
+			if !slices.Contains(roles, role) {
+				writeJSONError(w, http.StatusForbidden, "forbidden: insufficient role")
 				return
 			}
 
@@ -58,4 +88,3 @@ func RequireRole(role string, authEnabled bool) func(http.Handler) http.Handler 
 		})
 	}
 }
-

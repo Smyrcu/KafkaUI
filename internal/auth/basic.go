@@ -22,10 +22,21 @@ func NewBasicAuthenticator(users []config.BasicUser) *BasicAuthenticator {
 	return &BasicAuthenticator{users: m}
 }
 
+// ConfigRoles returns the roles configured for the given username in the YAML
+// config file, or nil if the user is not found or has no roles configured.
+// These roles are used as admin overrides when no DB role assignments exist.
+func (a *BasicAuthenticator) ConfigRoles(username string) []string {
+	u, ok := a.users[username]
+	if !ok {
+		return nil
+	}
+	return u.Roles
+}
+
 // Authenticate checks username/password against configured users.
-// Returns SessionData on success or an error on failure.
+// Returns a UserIdentity on success or an error on failure.
 // The error message is intentionally generic to prevent user enumeration.
-func (a *BasicAuthenticator) Authenticate(username, password string) (*SessionData, error) {
+func (a *BasicAuthenticator) Authenticate(username, password string) (*UserIdentity, error) {
 	user, ok := a.users[username]
 	if !ok {
 		// Spend time on bcrypt to prevent timing attacks
@@ -37,9 +48,11 @@ func (a *BasicAuthenticator) Authenticate(username, password string) (*SessionDa
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	return &SessionData{
-		Email: user.Username,
-		Name:  user.Username,
-		Roles: user.Roles,
+	return &UserIdentity{
+		ProviderName: "basic",
+		ProviderType: "basic",
+		ExternalID:   user.Username,
+		Email:        user.Username,
+		Name:         user.Username,
 	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -30,18 +31,24 @@ type MaskingField struct {
 }
 
 type ServerConfig struct {
-	Port     int    `yaml:"port"`
-	BasePath string `yaml:"base-path"`
-	Debug    bool   `yaml:"debug"`
+	Port        int      `yaml:"port"`
+	BasePath    string   `yaml:"base-path"`
+	Debug       bool     `yaml:"debug"`
+	TrustProxy  bool     `yaml:"trust-proxy"`
+	CORSOrigins []string `yaml:"cors-origins"`
 }
 
 type AuthConfig struct {
-	Enabled bool            `yaml:"enabled"`
-	Types   []string        `yaml:"types"`
-	OIDC    OIDCConfig      `yaml:"oidc"`
-	Basic   BasicAuthConfig `yaml:"basic"`
-	Session SessionConfig   `yaml:"session"`
-	RBAC    []RBACRule      `yaml:"rbac"`
+	Enabled        bool                 `yaml:"enabled"`
+	Types          []string             `yaml:"types"`
+	DefaultRole    string               `yaml:"default-role"`
+	OIDC           OIDCConfig           `yaml:"oidc"`
+	OAuth2         OAuth2Config         `yaml:"oauth2"`
+	Basic          BasicAuthConfig      `yaml:"basic"`
+	Session        SessionConfig        `yaml:"session"`
+	RBAC           RBACConfig           `yaml:"rbac"`
+	AutoAssignment []AutoAssignmentRule `yaml:"auto-assignment"`
+	Storage        StorageConfig        `yaml:"storage"`
 }
 
 type BasicAuthConfig struct {
@@ -79,10 +86,49 @@ type SessionConfig struct {
 	MaxAge int    `yaml:"max-age"`
 }
 
+type OAuth2Config struct {
+	RedirectURL string           `yaml:"redirect-url"`
+	Providers   []OAuth2Provider `yaml:"providers"`
+}
+
+type OAuth2Provider struct {
+	Name         string   `yaml:"name"`
+	DisplayName  string   `yaml:"display-name"`
+	ClientID     string   `yaml:"client-id"`
+	ClientSecret string   `yaml:"client-secret"`
+	Scopes       []string `yaml:"scopes"`
+	AuthURL      string   `yaml:"auth-url"`
+	TokenURL     string   `yaml:"token-url"`
+	APIURL       string   `yaml:"api-url"`
+}
+
+type RBACConfig struct {
+	RoleGroups map[string][]string `yaml:"role-groups"`
+	Rules      []RBACRule          `yaml:"rules"`
+}
+
 type RBACRule struct {
 	Role     string   `yaml:"role"`
 	Clusters []string `yaml:"clusters"`
 	Actions  []string `yaml:"actions"`
+}
+
+type AutoAssignmentRule struct {
+	Role  string              `yaml:"role"`
+	Match AutoAssignmentMatch `yaml:"match"`
+}
+
+type AutoAssignmentMatch struct {
+	Authenticated bool     `yaml:"authenticated"`
+	Emails        []string `yaml:"emails"`
+	EmailDomains  []string `yaml:"email-domains"`
+	GitHubOrgs    []string `yaml:"github-orgs"`
+	GitHubTeams   []string `yaml:"github-teams"`
+	GitLabGroups  []string `yaml:"gitlab-groups"`
+}
+
+type StorageConfig struct {
+	Path string `yaml:"path"`
 }
 
 type ClusterConfig struct {
@@ -146,5 +192,72 @@ func Load(path string) (*Config, error) {
 		cfg.Server.Port = 8080
 	}
 
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	return &cfg, nil
+}
+
+// validAuthTypes is the set of recognised authentication type strings.
+var validAuthTypes = []string{"basic", "oidc", "oauth2"}
+
+// Validate checks that the configuration is semantically consistent.
+// It returns a descriptive error for the first violation found.
+func (c *Config) Validate() error {
+	if !c.Auth.Enabled {
+		return nil
+	}
+
+	if len(c.Auth.Types) == 0 {
+		return fmt.Errorf("auth.enabled is true but auth.types is empty — specify at least one of: basic, oidc, oauth2")
+	}
+
+	for _, t := range c.Auth.Types {
+		if !slices.Contains(validAuthTypes, t) {
+			return fmt.Errorf("auth.types contains unrecognised value %q — valid values are: basic, oidc, oauth2", t)
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "basic") {
+		if len(c.Auth.Basic.Users) == 0 {
+			return fmt.Errorf("auth.types includes \"basic\" but auth.basic.users is empty — add at least one user")
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "oidc") {
+		if c.Auth.OIDC.RedirectURL == "" {
+			return fmt.Errorf("auth.types includes \"oidc\" but auth.oidc.redirect-url is empty")
+		}
+		if len(c.Auth.OIDC.Providers) == 0 {
+			return fmt.Errorf("auth.types includes \"oidc\" but auth.oidc.providers is empty — add at least one provider")
+		}
+		for i, p := range c.Auth.OIDC.Providers {
+			if p.Issuer == "" {
+				return fmt.Errorf("auth.oidc.providers[%d] (%q): issuer must not be empty", i, p.Name)
+			}
+			if p.ClientID == "" {
+				return fmt.Errorf("auth.oidc.providers[%d] (%q): client-id must not be empty", i, p.Name)
+			}
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "oauth2") {
+		if c.Auth.OAuth2.RedirectURL == "" {
+			return fmt.Errorf("auth.types includes \"oauth2\" but auth.oauth2.redirect-url is empty")
+		}
+		if len(c.Auth.OAuth2.Providers) == 0 {
+			return fmt.Errorf("auth.types includes \"oauth2\" but auth.oauth2.providers is empty — add at least one provider")
+		}
+		for i, p := range c.Auth.OAuth2.Providers {
+			if p.ClientID == "" {
+				return fmt.Errorf("auth.oauth2.providers[%d] (%q): client-id must not be empty", i, p.Name)
+			}
+			if p.ClientSecret == "" {
+				return fmt.Errorf("auth.oauth2.providers[%d] (%q): client-secret must not be empty", i, p.Name)
+			}
+		}
+	}
+
+	return nil
 }

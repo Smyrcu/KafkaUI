@@ -19,8 +19,8 @@ type RouterDeps struct {
 	Sessions           *auth.SessionManager
 	AuthEnabled        bool
 	MaskingEngine      *masking.Engine
-	OIDCProviders      map[string]*auth.Provider
-	OIDCProviderCfg    []config.OIDCProvider
+	Providers          map[string]auth.IdentityProvider
+	ProviderList       []auth.ProviderInfo
 	BasicAuth          *auth.BasicAuthenticator
 	RateLimiter        *auth.LoginRateLimiter
 	AuthTypes          []string
@@ -28,4 +28,10 @@ type RouterDeps struct {
 	MockMetrics        http.Handler
 	DynamicCfg         *config.DynamicConfig
 	StaticClusterNames []string
+	UserStore          *auth.UserStore
+	RBAC               *auth.RBAC
+	AutoAssignment     []config.AutoAssignmentRule
+	DefaultRole        string
+	TrustProxy         bool
+	CORSOrigins        []string
 }

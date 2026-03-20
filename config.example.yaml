@@ -1,14 +1,21 @@
 server:
   port: 8080
   base-path: ""
+  # trust-proxy: false    # set to true when running behind a reverse proxy (nginx, Traefik, etc.)
+  #                       # enables X-Forwarded-For parsing for rate-limiter IP detection
+  # cors-origins: []      # allowed CORS origins; defaults to ["*"] when empty
+  #                       # example: ["https://kafkaui.example.com"]
 
 auth:
   enabled: false
 
+# ---------------------------------------------------------------------------
 # Basic auth example:
+# ---------------------------------------------------------------------------
 # auth:
 #   enabled: true
 #   types: [basic]
+#   default-role: viewer                 # role assigned to every authenticated user (optional)
 #   basic:
 #     users:
 #       - username: admin
@@ -24,17 +31,23 @@ auth:
 #     secret: "${SESSION_SECRET}"  # set via environment variable
 #     max-age: 86400               # 24 hours
 #   rbac:
-#     - role: admin
-#       clusters: ["*"]
-#       actions: ["*"]
-#     - role: viewer
-#       clusters: ["*"]
-#       actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
+#     role-groups:                  # named groups of roles for reuse in rules
+#       ops: [admin, viewer]
+#     rules:
+#       - role: admin
+#         clusters: ["*"]
+#         actions: ["*"]
+#       - role: viewer
+#         clusters: ["*"]
+#         actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
 
-# OIDC (single provider) example:
+# ---------------------------------------------------------------------------
+# OIDC (single provider) example — Google:
+# ---------------------------------------------------------------------------
 # auth:
 #   enabled: true
 #   types: [oidc]
+#   default-role: viewer
 #   oidc:
 #     redirect-url: "http://localhost:8080/api/v1/auth/callback"
 #     providers:
@@ -45,8 +58,87 @@ auth:
 #   session:
 #     secret: "${SESSION_SECRET}"
 #     max-age: 86400
+#   rbac:
+#     role-groups: {}
+#     rules:
+#       - role: admin
+#         clusters: ["*"]
+#         actions: ["*"]
+#       - role: viewer
+#         clusters: ["*"]
+#         actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
 
+# ---------------------------------------------------------------------------
+# OIDC — Google + GitLab providers:
+# ---------------------------------------------------------------------------
+# auth:
+#   enabled: true
+#   types: [oidc]
+#   oidc:
+#     redirect-url: "http://localhost:8080/api/v1/auth/callback"
+#     providers:
+#       - name: google
+#         display-name: "Google"
+#         issuer: "https://accounts.google.com"
+#         client-id: "${GOOGLE_CLIENT_ID}"
+#         client-secret: "${GOOGLE_CLIENT_SECRET}"
+#       - name: gitlab
+#         display-name: "GitLab"
+#         issuer: "https://gitlab.com"
+#         client-id: "${GITLAB_CLIENT_ID}"
+#         client-secret: "${GITLAB_CLIENT_SECRET}"
+#         scopes: [openid, email, profile]
+#   session:
+#     secret: "${SESSION_SECRET}"
+#     max-age: 86400
+
+# ---------------------------------------------------------------------------
+# OAuth2 (GitHub) example — only GitHub is currently supported as an OAuth2 provider.
+# Generic OAuth2 (Gitea, Forgejo, etc.) would need dedicated provider implementations.
+# ---------------------------------------------------------------------------
+# auth:
+#   enabled: true
+#   types: [oauth2]
+#   oauth2:
+#     redirect-url: "http://localhost:8080/api/v1/auth/oauth2/callback"
+#     providers:
+#       - name: github
+#         display-name: "GitHub"
+#         client-id: "${GITHUB_CLIENT_ID}"
+#         client-secret: "${GITHUB_CLIENT_SECRET}"
+#         scopes: [read:org]            # read:org required for org/team membership checks
+#         # auth-url, token-url, api-url are optional — defaults to github.com URLs
+#         # These fields exist for GitHub Enterprise; generic OAuth2 providers are NOT yet supported.
+#         # auth-url:  "https://github.example.com/login/oauth/authorize"
+#         # token-url: "https://github.example.com/login/oauth/access_token"
+#         # api-url:   "https://github.example.com/api/v3"
+#   session:
+#     secret: "${SESSION_SECRET}"
+#     max-age: 86400
+#   auto-assignment:
+#     - role: admin
+#       match:
+#         github-orgs: [my-org]         # any member of my-org gets admin
+#         github-teams: [my-org/ops]    # AND member of the ops team
+#     - role: viewer
+#       match:
+#         authenticated: true           # fallback: every authenticated user gets viewer
+#   rbac:
+#     role-groups:
+#       ops: [admin, viewer]
+#     rules:
+#       - role: admin
+#         clusters: ["*"]
+#         actions: ["*"]
+#       - role: viewer
+#         clusters: ["*"]
+#         actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
+#   storage:
+#     path: "/var/lib/kafkaui/sessions.db"   # SQLite path for OAuth2 state / session tokens
+
+# ---------------------------------------------------------------------------
 # Multiple OIDC providers + basic auth:
+# ---------------------------------------------------------------------------
 # auth:
 #   enabled: true
 #   types: [basic, oidc]
@@ -69,6 +161,71 @@ auth:
 #         client-secret: "${AUTH0_CLIENT_SECRET}"
 #   session:
 #     secret: "${SESSION_SECRET}"
+
+# ---------------------------------------------------------------------------
+# Combined — basic + OIDC + OAuth2, full RBAC with groups and auto-assignment:
+# ---------------------------------------------------------------------------
+# auth:
+#   enabled: true
+#   types: [basic, oidc, oauth2]
+#   default-role: viewer
+#   basic:
+#     users:
+#       - username: admin
+#         password: "$2a$10$..."
+#         roles: [admin]
+#     rate-limit:
+#       max-attempts: 5
+#       window-seconds: 60
+#   oidc:
+#     redirect-url: "http://localhost:8080/api/v1/auth/oidc/callback"
+#     providers:
+#       - name: google
+#         display-name: "Google"
+#         issuer: "https://accounts.google.com"
+#         client-id: "${GOOGLE_CLIENT_ID}"
+#         client-secret: "${GOOGLE_CLIENT_SECRET}"
+#       - name: gitlab
+#         display-name: "GitLab"
+#         issuer: "https://gitlab.com"
+#         client-id: "${GITLAB_CLIENT_ID}"
+#         client-secret: "${GITLAB_CLIENT_SECRET}"
+#         scopes: [openid, email, profile]
+#   oauth2:
+#     redirect-url: "http://localhost:8080/api/v1/auth/oauth2/callback"
+#     providers:
+#       - name: github
+#         display-name: "GitHub"
+#         client-id: "${GITHUB_CLIENT_ID}"
+#         client-secret: "${GITHUB_CLIENT_SECRET}"
+#         scopes: [read:org]
+#   session:
+#     secret: "${SESSION_SECRET}"
+#     max-age: 86400
+#   rbac:
+#     role-groups:                        # define named groups that map to multiple roles
+#       engineering: [admin, viewer]
+#       readonly: [viewer]
+#     rules:
+#       - role: admin
+#         clusters: ["*"]
+#         actions: ["*"]
+#       - role: viewer
+#         clusters: ["*"]
+#         actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
+#   auto-assignment:                      # rules evaluated top-to-bottom; multiple can match
+#     - role: admin
+#       match:                            # fields within match are AND-ed
+#         emails: [alice@example.com]     # exact email match
+#         github-orgs: [my-org]          # AND member of the GitHub org
+#         github-teams: [my-org/ops]     # AND member of the ops team
+#         gitlab-groups: [my-group/ops]  # AND member of a GitLab group
+#     - role: viewer
+#       match:
+#         email-domains: [example.com]   # anyone with an @example.com address
+#         authenticated: true            # fallback: every authenticated user
+#   storage:
+#     path: "/var/lib/kafkaui/sessions.db"
 
 clusters:
   - name: local

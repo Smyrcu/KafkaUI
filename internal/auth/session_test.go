@@ -8,13 +8,12 @@ import (
 )
 
 func TestSessionManager_CreateAndGet(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
-		Token: "test-token",
-		Email: "user@example.com",
-		Name:  "Test User",
-		Roles: []string{"admin"},
+		UserID: "user-123",
+		Email:  "user@example.com",
+		Name:   "Test User",
 	}
 
 	// Create a response recorder to capture the cookie
@@ -36,8 +35,8 @@ func TestSessionManager_CreateAndGet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if got.Token != data.Token {
-		t.Errorf("expected token %q, got %q", data.Token, got.Token)
+	if got.UserID != data.UserID {
+		t.Errorf("expected user_id %q, got %q", data.UserID, got.UserID)
 	}
 	if got.Email != data.Email {
 		t.Errorf("expected email %q, got %q", data.Email, got.Email)
@@ -45,24 +44,15 @@ func TestSessionManager_CreateAndGet(t *testing.T) {
 	if got.Name != data.Name {
 		t.Errorf("expected name %q, got %q", data.Name, got.Name)
 	}
-	if len(got.Roles) != len(data.Roles) {
-		t.Fatalf("expected %d roles, got %d", len(data.Roles), len(got.Roles))
-	}
-	for i, role := range data.Roles {
-		if got.Roles[i] != role {
-			t.Errorf("expected role[%d] %q, got %q", i, role, got.Roles[i])
-		}
-	}
 }
 
 func TestSessionManager_InvalidSignature(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
-		Token: "test-token",
-		Email: "user@example.com",
-		Name:  "Test User",
-		Roles: []string{"admin"},
+		UserID: "user-123",
+		Email:  "user@example.com",
+		Name:   "Test User",
 	}
 
 	rec := httptest.NewRecorder()
@@ -89,7 +79,7 @@ func TestSessionManager_InvalidSignature(t *testing.T) {
 }
 
 func TestSessionManager_NoCookie(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -100,13 +90,12 @@ func TestSessionManager_NoCookie(t *testing.T) {
 }
 
 func TestSessionManager_ClearSession(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
-		Token: "test-token",
-		Email: "user@example.com",
-		Name:  "Test User",
-		Roles: []string{"viewer"},
+		UserID: "user-456",
+		Email:  "user@example.com",
+		Name:   "Test User",
 	}
 
 	// Create a session
@@ -159,13 +148,12 @@ func TestSessionManager_ClearSession(t *testing.T) {
 
 func TestSessionManager_DefaultMaxAge(t *testing.T) {
 	// Create with maxAge=0, should default to 86400
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 0)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 0, false)
 
 	data := SessionData{
-		Token: "default-age-token",
-		Email: "default@example.com",
-		Name:  "Default User",
-		Roles: []string{"viewer"},
+		UserID: "user-789",
+		Email:  "default@example.com",
+		Name:   "Default User",
 	}
 
 	rec := httptest.NewRecorder()
