@@ -449,6 +449,8 @@ func (h *AuthHandler) Permissions(w http.ResponseWriter, r *http.Request) {
 }
 
 // upsertAndResolve persists the identity and resolves effective roles.
+// The very first user to log in is automatically granted the admin role
+// so there is always someone who can access the admin panel.
 func (h *AuthHandler) upsertAndResolve(identity *auth.UserIdentity) (*auth.User, []string, error) {
 	if h.userStore == nil {
 		return &auth.User{
@@ -457,9 +459,20 @@ func (h *AuthHandler) upsertAndResolve(identity *auth.UserIdentity) (*auth.User,
 		}, []string{}, nil
 	}
 
-	user, _, err := h.userStore.UpsertUser(identity)
+	user, created, err := h.userStore.UpsertUser(identity)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Auto-promote the very first user to admin.
+	if created {
+		if count, err := h.userStore.UserCount(); err == nil && count == 1 {
+			if assignErr := h.userStore.AssignRole(user.ID, "admin"); assignErr != nil {
+				h.logger.Warn("failed to auto-assign admin to first user", "user", user.ID, "error", assignErr)
+			} else {
+				h.logger.Info("first user auto-promoted to admin", "user", user.ID, "email", user.Email)
+			}
+		}
 	}
 
 	roles, err := auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)

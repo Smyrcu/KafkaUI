@@ -252,8 +252,8 @@ func TestClient_RestartConnector(t *testing.T) {
 
 func TestClient_PauseConnector(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
 		}
 		if r.URL.Path != "/connectors/test-conn/pause" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -273,8 +273,8 @@ func TestClient_PauseConnector(t *testing.T) {
 
 func TestClient_ResumeConnector(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
 		}
 		if r.URL.Path != "/connectors/test-conn/resume" {
 			t.Errorf("unexpected path: %s", r.URL.Path)

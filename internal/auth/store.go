@@ -211,6 +211,13 @@ func (s *UserStore) GetUserByProvider(provider, externalID string) (*User, error
 	return u, nil
 }
 
+// UserCount returns the total number of registered users.
+func (s *UserStore) UserCount() (int, error) {
+	var count int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+	return count, err
+}
+
 // ListUsers returns all users including their roles.
 func (s *UserStore) ListUsers() ([]User, error) {
 	rows, err := s.db.Query(`
