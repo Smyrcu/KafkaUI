@@ -203,12 +203,18 @@ func (c *Client) ResumeConnector(ctx context.Context, name string) error {
 	return c.doAction(ctx, name, "resume")
 }
 
-// doAction performs a POST action (restart, pause, resume) on a connector.
+// doAction performs a connector action (restart, pause, resume).
+// Kafka Connect REST API uses POST for restart, PUT for pause/resume.
 func (c *Client) doAction(ctx context.Context, name, action string) error {
 	escaped := url.PathEscape(name)
 	path := fmt.Sprintf("/connectors/%s/%s", escaped, action)
 
-	if _, err := c.http.DoRaw(ctx, "POST", path, nil); err != nil {
+	method := "PUT"
+	if action == "restart" {
+		method = "POST"
+	}
+
+	if _, err := c.http.DoRaw(ctx, method, path, nil); err != nil {
 		return fmt.Errorf("%s connector %q: %w", action, name, err)
 	}
 

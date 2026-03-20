@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -71,6 +72,10 @@ func (h *ConsumerGroupHandler) ResetOffsets(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := client.ResetConsumerGroupOffsets(r.Context(), groupName, req); err != nil {
+		if strings.Contains(err.Error(), "must be Empty") {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeInternalError(w, "resetting consumer group offsets", err)
 		return
 	}

@@ -51,9 +51,10 @@ type PartitionInfo struct {
 }
 
 type CreateTopicRequest struct {
-	Name       string `json:"name"`
-	Partitions int32  `json:"partitions"`
-	Replicas   int16  `json:"replicas"`
+	Name       string            `json:"name"`
+	Partitions int32             `json:"partitions"`
+	Replicas   int16             `json:"replicas"`
+	Configs    map[string]string `json:"configs,omitempty"`
 }
 
 type MessageRecord struct {
@@ -233,7 +234,15 @@ func (c *Client) TopicDetails(ctx context.Context, name string) (*TopicDetail, e
 }
 
 func (c *Client) CreateTopic(ctx context.Context, req CreateTopicRequest) error {
-	resp, err := c.admin.CreateTopics(ctx, int32(req.Partitions), req.Replicas, nil, req.Name)
+	var configs map[string]*string
+	if len(req.Configs) > 0 {
+		configs = make(map[string]*string, len(req.Configs))
+		for k, v := range req.Configs {
+			v := v
+			configs[k] = &v
+		}
+	}
+	resp, err := c.admin.CreateTopics(ctx, int32(req.Partitions), req.Replicas, configs, req.Name)
 	if err != nil {
 		return fmt.Errorf("creating topic: %w", err)
 	}
@@ -604,8 +613,21 @@ func (c *Client) ConsumerGroupDetails(ctx context.Context, name string) (*Consum
 }
 
 func (c *Client) ResetConsumerGroupOffsets(ctx context.Context, group string, req ResetOffsetsRequest) error {
+	// Verify the group is Empty — active consumers will overwrite committed offsets.
+	described, err := c.admin.DescribeGroups(ctx, group)
+	if err != nil {
+		return fmt.Errorf("describing group %q: %w", group, err)
+	}
+	sorted := described.Sorted()
+	if len(sorted) == 0 {
+		return fmt.Errorf("consumer group %q not found", group)
+	}
+	state := sorted[0].State
+	if state != "Empty" {
+		return fmt.Errorf("consumer group %q is in state %q — must be Empty to reset offsets (stop all consumers first)", group, state)
+	}
+
 	var targetOffsets kadm.ListedOffsets
-	var err error
 
 	switch req.ResetTo {
 	case "earliest":
