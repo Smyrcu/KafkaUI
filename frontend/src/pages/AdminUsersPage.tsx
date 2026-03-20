@@ -155,6 +155,7 @@ export function AdminUsersPage() {
   const { data: users, isLoading, error, refetch } = useQuery({
     queryKey: ["admin-users"],
     queryFn: api.admin.listUsers,
+    enabled: canManageUsers,
   });
 
   const deleteMutation = useMutation({

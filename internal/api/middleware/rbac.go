@@ -27,12 +27,12 @@ func RequireAction(deps RBACDeps, action string, authEnabled bool) func(http.Han
 
 			session, ok := r.Context().Value(UserContextKey).(*auth.SessionData)
 			if !ok || session == nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
 			if deps.Store == nil {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden")
 				return
 			}
 
@@ -45,22 +45,23 @@ func RequireAction(deps RBACDeps, action string, authEnabled bool) func(http.Han
 			// will call GetRoles itself when checking for admin overrides.
 			user, err := deps.Store.GetUserBasic(session.UserID)
 			if err != nil {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden")
 				return
 			}
 			identity := &auth.UserIdentity{
-				Email: user.Email,
-				Orgs:  user.Orgs,
-				Teams: user.Teams,
+				ExternalID: user.ExternalID,
+				Email:      user.Email,
+				Orgs:       user.Orgs,
+				Teams:      user.Teams,
 			}
 			roles, err := auth.ResolveRoles(deps.Store, session.UserID, identity, deps.AutoRules, deps.DefaultRole)
 			if err != nil {
-				http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden")
 				return
 			}
 
 			if !deps.RBAC.IsAllowed(roles, cluster, action) {
-				http.Error(w, `{"error":"forbidden: insufficient permissions"}`, http.StatusForbidden)
+				writeJSONError(w, http.StatusForbidden, "forbidden: insufficient permissions")
 				return
 			}
 

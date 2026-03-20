@@ -30,7 +30,7 @@ func matchesRule(match config.AutoAssignmentMatch, identity *UserIdentity) bool 
 
 	if match.Authenticated {
 		conditions++
-		if identity.Email != "" {
+		if identity.ExternalID != "" {
 			matched++
 		}
 	}

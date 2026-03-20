@@ -22,10 +22,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 	if len(deps.CORSOrigins) > 0 {
 		corsOrigins = deps.CORSOrigins
 	}
+	allowCredentials := len(deps.CORSOrigins) > 0 // only when explicit origins configured
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   corsOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowCredentials: allowCredentials,
 		MaxAge:           300,
 	}))
 	r.Use(middleware.MaxBodySize(5 << 20))
@@ -75,6 +77,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	}
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(middleware.RequireJSONContentType)
 		r.Get("/docs", handlers.SwaggerUI)
 		r.Get("/docs/openapi.yaml", handlers.SwaggerSpec)
 
@@ -104,7 +107,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 			r.With(requireAction("view_dashboard")).Get("/clusters", clusterHandler.List)
 
 			r.Route("/admin", func(r chi.Router) {
-				r.Use(middleware.RequireRole("admin", deps.AuthEnabled, deps.UserStore))
+				r.Use(middleware.RequireRole("admin", deps.AuthEnabled, rbacDeps))
 				r.Get("/clusters", adminHandler.ListClusters)
 				r.Post("/clusters", adminHandler.AddCluster)
 				r.Post("/clusters/test", adminHandler.TestConnection)

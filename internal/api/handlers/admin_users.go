@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/auth"
 )
 
@@ -60,7 +61,11 @@ func (h *AdminUsersHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	user, err := h.store.GetUser(id)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "user not found")
+		if errors.Is(err, auth.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+		} else {
+			writeInternalError(w, "getting user", err)
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
@@ -88,38 +93,24 @@ func (h *AdminUsersHandler) SetRoles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	// Prevent self-modification of roles
+	if session, ok := r.Context().Value(middleware.UserContextKey).(*auth.SessionData); ok && session.UserID == id {
+		writeError(w, http.StatusForbidden, "cannot modify your own roles")
+		return
+	}
+
 	if _, err := h.store.GetUser(id); err != nil {
-		writeError(w, http.StatusNotFound, "user not found")
+		if errors.Is(err, auth.ErrUserNotFound) {
+			writeError(w, http.StatusNotFound, "user not found")
+		} else {
+			writeInternalError(w, "getting user", err)
+		}
 		return
 	}
-	currentRoles, err := h.store.GetRoles(id)
-	if err != nil {
-		writeInternalError(w, "getting current roles", err)
+	if err := h.store.SetRoles(id, req.Roles); err != nil {
+		writeInternalError(w, "setting roles", err)
 		return
-	}
-	currentSet := make(map[string]bool)
-	for _, role := range currentRoles {
-		currentSet[role] = true
-	}
-	newSet := make(map[string]bool)
-	for _, role := range req.Roles {
-		newSet[role] = true
-	}
-	for _, role := range currentRoles {
-		if !newSet[role] {
-			if err := h.store.RemoveRole(id, role); err != nil {
-				writeInternalError(w, "removing role", err)
-				return
-			}
-		}
-	}
-	for _, role := range req.Roles {
-		if !currentSet[role] {
-			if err := h.store.AssignRole(id, role); err != nil {
-				writeInternalError(w, "assigning role", err)
-				return
-			}
-		}
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "roles updated"})
 }

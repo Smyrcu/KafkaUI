@@ -253,6 +253,9 @@ func (c *Config) Validate() error {
 			if p.ClientID == "" {
 				return fmt.Errorf("auth.oauth2.providers[%d] (%q): client-id must not be empty", i, p.Name)
 			}
+			if p.ClientSecret == "" {
+				return fmt.Errorf("auth.oauth2.providers[%d] (%q): client-secret must not be empty", i, p.Name)
+			}
 		}
 	}
 

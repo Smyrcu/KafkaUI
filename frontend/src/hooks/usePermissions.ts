@@ -22,5 +22,8 @@ export function useHasAction(action: string): boolean {
   // Deny during loading to prevent flash of authorized content
   if (isLoading || !data) return false;
 
+  // Empty actions = no permissions loaded (likely cookie not sent)
+  if (data.actions.length === 0) return false;
+
   return data.actions.includes(action) || data.actions.includes("*");
 }

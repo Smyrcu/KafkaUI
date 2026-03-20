@@ -8,7 +8,7 @@ import (
 )
 
 func TestSessionManager_CreateAndGet(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
 		UserID: "user-123",
@@ -47,7 +47,7 @@ func TestSessionManager_CreateAndGet(t *testing.T) {
 }
 
 func TestSessionManager_InvalidSignature(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
 		UserID: "user-123",
@@ -79,7 +79,7 @@ func TestSessionManager_InvalidSignature(t *testing.T) {
 }
 
 func TestSessionManager_NoCookie(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -90,7 +90,7 @@ func TestSessionManager_NoCookie(t *testing.T) {
 }
 
 func TestSessionManager_ClearSession(t *testing.T) {
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 3600)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	data := SessionData{
 		UserID: "user-456",
@@ -148,7 +148,7 @@ func TestSessionManager_ClearSession(t *testing.T) {
 
 func TestSessionManager_DefaultMaxAge(t *testing.T) {
 	// Create with maxAge=0, should default to 86400
-	sm := NewSessionManager("test-secret-key-32-chars-long!!", 0)
+	sm, _ := NewSessionManager("test-secret-key-that-is-32-chars", 0, false)
 
 	data := SessionData{
 		UserID: "user-789",

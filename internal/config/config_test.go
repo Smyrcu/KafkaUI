@@ -604,7 +604,7 @@ func TestValidate_OAuth2Valid(t *testing.T) {
 		Types:   []string{"oauth2"},
 		OAuth2: OAuth2Config{
 			RedirectURL: "http://localhost/callback",
-			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id"}},
+			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id", ClientSecret: "gh-secret"}},
 		},
 	}}
 	if err := cfg.Validate(); err != nil {
@@ -623,7 +623,7 @@ func TestValidate_MultipleTypesAllValid(t *testing.T) {
 		},
 		OAuth2: OAuth2Config{
 			RedirectURL: "http://localhost/callback",
-			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id"}},
+			Providers:   []OAuth2Provider{{Name: "github", ClientID: "gh-id", ClientSecret: "gh-secret"}},
 		},
 	}}
 	if err := cfg.Validate(); err != nil {

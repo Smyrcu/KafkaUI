@@ -11,7 +11,7 @@ func TestAutoAssign_AuthenticatedMatchesAll(t *testing.T) {
 		{Role: "viewer", Match: config.AutoAssignmentMatch{Authenticated: true}},
 	}
 
-	identity := &UserIdentity{Email: "anyone@example.com"}
+	identity := &UserIdentity{ExternalID: "ext-1", Email: "anyone@example.com"}
 	roles := AutoAssign(rules, identity)
 
 	if len(roles) != 1 || roles[0] != "viewer" {
@@ -19,7 +19,7 @@ func TestAutoAssign_AuthenticatedMatchesAll(t *testing.T) {
 	}
 }
 
-func TestAutoAssign_AuthenticatedRequiresEmail(t *testing.T) {
+func TestAutoAssign_AuthenticatedRequiresExternalID(t *testing.T) {
 	rules := []config.AutoAssignmentRule{
 		{Role: "viewer", Match: config.AutoAssignmentMatch{Authenticated: true}},
 	}
@@ -216,7 +216,7 @@ func TestAutoAssign_ORLogicAcrossRules(t *testing.T) {
 	}
 
 	t.Run("matches all rules", func(t *testing.T) {
-		identity := &UserIdentity{Email: "boss@company.com"}
+		identity := &UserIdentity{ExternalID: "ext-1", Email: "boss@company.com"}
 		roles := AutoAssign(rules, identity)
 		if len(roles) != 3 {
 			t.Errorf("expected 3 roles, got %v", roles)
@@ -224,7 +224,7 @@ func TestAutoAssign_ORLogicAcrossRules(t *testing.T) {
 	})
 
 	t.Run("matches two rules", func(t *testing.T) {
-		identity := &UserIdentity{Email: "staff@company.com"}
+		identity := &UserIdentity{ExternalID: "ext-2", Email: "staff@company.com"}
 		roles := AutoAssign(rules, identity)
 		if len(roles) != 2 {
 			t.Errorf("expected [viewer editor], got %v", roles)
@@ -232,7 +232,7 @@ func TestAutoAssign_ORLogicAcrossRules(t *testing.T) {
 	})
 
 	t.Run("matches one rule", func(t *testing.T) {
-		identity := &UserIdentity{Email: "outsider@other.com"}
+		identity := &UserIdentity{ExternalID: "ext-3", Email: "outsider@other.com"}
 		roles := AutoAssign(rules, identity)
 		if len(roles) != 1 || roles[0] != "viewer" {
 			t.Errorf("expected [viewer], got %v", roles)
@@ -247,7 +247,7 @@ func TestAutoAssign_DeduplicatesRoles(t *testing.T) {
 		{Role: "editor", Match: config.AutoAssignmentMatch{Emails: []string{"alice@company.com"}}},
 	}
 
-	identity := &UserIdentity{Email: "alice@company.com"}
+	identity := &UserIdentity{ExternalID: "ext-1", Email: "alice@company.com"}
 	roles := AutoAssign(rules, identity)
 
 	if len(roles) != 2 {

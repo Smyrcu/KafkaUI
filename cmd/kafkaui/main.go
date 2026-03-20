@@ -117,7 +117,8 @@ func initProviders(cfg *config.Config, logger *slog.Logger) (map[string]auth.Ide
 		}
 	}
 
-	// OAuth2 providers (GitHub, etc.)
+	// OAuth2 providers — currently only GitHub is supported.
+	// Generic OAuth2 (Gitea, Forgejo, etc.) would need dedicated provider implementations.
 	if slices.Contains(cfg.Auth.Types, "oauth2") {
 		for _, p := range cfg.Auth.OAuth2.Providers {
 			provider := auth.NewGitHubProvider(p, cfg.Auth.OAuth2.RedirectURL, "", logger)
@@ -220,7 +221,11 @@ func main() {
 		// Auth disabled: use a placeholder so SessionManager initialises without a blank key.
 		sessionSecret = "kafkaui-default-secret-change-me"
 	}
-	sessions := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge)
+	sessions, err := auth.NewSessionManager(sessionSecret, cfg.Auth.Session.MaxAge, cfg.Server.TrustProxy)
+	if err != nil {
+		logger.Error("failed to create session manager", "error", err)
+		os.Exit(1)
+	}
 
 	// Create masking engine (nil-safe; handlers skip masking when nil rules)
 	var maskingEngine *masking.Engine
@@ -291,8 +296,9 @@ func main() {
 	spaHandler := newSPAHandler(http.FS(frontendContent))
 
 	mux := http.NewServeMux()
-	mux.Handle("/api/", router)
-	mux.Handle("/ws/", router)
+	apiTimeout := http.TimeoutHandler(router, 30*time.Second, `{"error":"request timeout"}`)
+	mux.Handle("/api/", apiTimeout)
+	mux.Handle("/ws/", router) // no timeout for WebSocket connections
 	mux.Handle("/debug/", router)
 	mux.Handle("/healthz", router)
 	mux.Handle("/readyz", router)

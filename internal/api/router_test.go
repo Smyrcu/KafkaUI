@@ -26,7 +26,10 @@ func newTestRouter(t *testing.T) http.Handler {
 	}
 	t.Cleanup(reg.Close)
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	sessions := auth.NewSessionManager("test-secret", 3600)
+	sessions, err := auth.NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
+	if err != nil {
+		t.Fatalf("failed to create session manager: %v", err)
+	}
 	dynamicCfg := config.NewDynamicConfig(t.TempDir() + "/dynamic.yaml")
 	return NewRouter(RouterDeps{
 		Registry:           reg,
@@ -123,9 +126,13 @@ func TestRouter_ClusterRoutes(t *testing.T) {
 			var req *http.Request
 			if tt.body != "" {
 				req = httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
-				req.Header.Set("Content-Type", "application/json")
 			} else {
 				req = httptest.NewRequest(tt.method, tt.path, nil)
+			}
+			// CSRF middleware requires Content-Type on mutating methods
+			switch tt.method {
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				req.Header.Set("Content-Type", "application/json")
 			}
 			rec := httptest.NewRecorder()
 
@@ -198,6 +205,11 @@ func TestRouter_NotFoundRoutes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
+			// CSRF middleware requires Content-Type on mutating methods
+			switch tt.method {
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				req.Header.Set("Content-Type", "application/json")
+			}
 			rec := httptest.NewRecorder()
 
 			router.ServeHTTP(rec, req)

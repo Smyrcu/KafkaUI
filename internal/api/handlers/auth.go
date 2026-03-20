@@ -90,7 +90,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 			ip = strings.TrimSpace(parts[0])
 		}
 	}
-	if !h.rateLimiter.Allow(ip) {
+	if h.rateLimiter != nil && !h.rateLimiter.Allow(ip) {
 		h.logger.Warn("login rate limited", "ip", ip)
 		writeError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
 		return
@@ -130,13 +130,22 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		if len(configRoles) > 0 {
 			if dbRoles, err := h.userStore.GetRoles(user.ID); err == nil && len(dbRoles) == 0 {
 				for _, role := range configRoles {
-					_ = h.userStore.AssignRole(user.ID, role)
+					if err := h.userStore.AssignRole(user.ID, role); err != nil {
+						h.logger.Warn("failed to seed config role", "user", user.ID, "role", role, "error", err)
+					}
 				}
 				// Re-resolve so the response reflects the newly seeded roles.
-				roles, _ = auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole)
+				if resolved, err := auth.ResolveRoles(h.userStore, user.ID, identity, h.autoRules, h.defaultRole); err != nil {
+					h.logger.Warn("failed to re-resolve roles after seeding", "user", user.ID, "error", err)
+				} else {
+					roles = resolved
+				}
 			}
 		}
 	}
+
+	// Invalidate any existing session before creating a new one
+	h.sessions.ClearSession(w, r)
 
 	if err := h.sessions.CreateSession(w, r, auth.SessionData{
 		UserID: user.ID,
@@ -181,7 +190,7 @@ func (h *AuthHandler) LoginProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	secure := auth.IsSecureRequest(r)
+	secure := auth.IsSecureRequest(r, h.trustProxy)
 	maxAge := int(5 * time.Minute / time.Second)
 
 	http.SetCookie(w, &http.Cookie{
@@ -211,6 +220,20 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	if !h.enabled || !h.hasExternalAuth() {
 		writeError(w, http.StatusNotFound, "external auth not enabled")
 		return
+	}
+
+	if h.rateLimiter != nil {
+		ip := r.RemoteAddr
+		if h.trustProxy {
+			if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+				parts := strings.Split(fwd, ",")
+				ip = strings.TrimSpace(parts[0])
+			}
+		}
+		if !h.rateLimiter.Allow(ip) {
+			writeError(w, http.StatusTooManyRequests, "too many requests, try again later")
+			return
+		}
 	}
 
 	code := r.URL.Query().Get("code")
@@ -253,7 +276,7 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedNonce := nonceCookie.Value
 
-	secure := auth.IsSecureRequest(r)
+	secure := auth.IsSecureRequest(r, h.trustProxy)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "oauth_state",
@@ -287,6 +310,9 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		writeInternalError(w, "upserting user", err)
 		return
 	}
+
+	// Invalidate any existing session before creating a new one
+	h.sessions.ClearSession(w, r)
 
 	if err := h.sessions.CreateSession(w, r, auth.SessionData{
 		UserID: user.ID,
@@ -414,6 +440,8 @@ func (h *AuthHandler) Permissions(w http.ResponseWriter, r *http.Request) {
 	}
 	actions := h.rbac.ExpandedActions(roles, "*")
 
+	// TODO: derive per-cluster permissions from RBAC rules for the user's roles.
+	// Currently returns ["*"] as a placeholder — the frontend treats this as "all clusters".
 	writeJSON(w, http.StatusOK, map[string]any{
 		"actions":  actions,
 		"clusters": []string{"*"},

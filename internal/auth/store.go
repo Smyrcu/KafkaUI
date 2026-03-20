@@ -185,6 +185,9 @@ func (s *UserStore) GetUserBasic(id string) (*User, error) {
 
 	u, err := scanUser(row)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("get user %s: %w", id, ErrUserNotFound)
+		}
 		return nil, fmt.Errorf("get user %s: %w", id, err)
 	}
 	return u, nil
@@ -285,6 +288,34 @@ func (s *UserStore) RemoveRole(userID, role string) error {
 		return fmt.Errorf("removing role %s from %s: %w", role, userID, err)
 	}
 	return nil
+}
+
+// SetRoles atomically replaces all role assignments for a user.
+func (s *UserStore) SetRoles(userID string, roles []string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("beginning transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM role_assignments WHERE user_id = ?`, userID); err != nil {
+		return fmt.Errorf("clearing roles: %w", err)
+	}
+
+	for _, role := range roles {
+		id, err := generateID()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO role_assignments (id, user_id, role) VALUES (?, ?, ?)`,
+			id, userID, role,
+		); err != nil {
+			return fmt.Errorf("assigning role %s: %w", role, err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 // GetRoles returns the list of roles assigned to the user.

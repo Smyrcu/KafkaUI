@@ -93,7 +93,8 @@ auth:
 #     max-age: 86400
 
 # ---------------------------------------------------------------------------
-# OAuth2 (GitHub) example:
+# OAuth2 (GitHub) example — only GitHub is currently supported as an OAuth2 provider.
+# Generic OAuth2 (Gitea, Forgejo, etc.) would need dedicated provider implementations.
 # ---------------------------------------------------------------------------
 # auth:
 #   enabled: true
@@ -107,10 +108,10 @@ auth:
 #         client-secret: "${GITHUB_CLIENT_SECRET}"
 #         scopes: [read:org]            # read:org required for org/team membership checks
 #         # auth-url, token-url, api-url are optional — defaults to github.com URLs
-#         # Specify them to use a generic OAuth2 provider (e.g. Gitea, Forgejo, self-hosted):
-#         # auth-url:  "https://git.example.com/login/oauth/authorize"
-#         # token-url: "https://git.example.com/login/oauth/access_token"
-#         # api-url:   "https://git.example.com/api/v1"
+#         # These fields exist for GitHub Enterprise; generic OAuth2 providers are NOT yet supported.
+#         # auth-url:  "https://github.example.com/login/oauth/authorize"
+#         # token-url: "https://github.example.com/login/oauth/access_token"
+#         # api-url:   "https://github.example.com/api/v3"
 #   session:
 #     secret: "${SESSION_SECRET}"
 #     max-age: 86400
@@ -118,7 +119,7 @@ auth:
 #     - role: admin
 #       match:
 #         github-orgs: [my-org]         # any member of my-org gets admin
-#         github-teams: [my-org/ops]    # OR any member of the ops team
+#         github-teams: [my-org/ops]    # AND member of the ops team
 #     - role: viewer
 #       match:
 #         authenticated: true           # fallback: every authenticated user gets viewer
@@ -214,11 +215,11 @@ auth:
 #         actions: [view_topics, view_messages, view_consumer_groups, view_schemas, view_connectors]
 #   auto-assignment:                      # rules evaluated top-to-bottom; multiple can match
 #     - role: admin
-#       match:                            # fields within match are OR-ed
+#       match:                            # fields within match are AND-ed
 #         emails: [alice@example.com]     # exact email match
-#         github-orgs: [my-org]          # any member of the GitHub org
-#         github-teams: [my-org/ops]     # OR member of the ops team
-#         gitlab-groups: [my-group/ops]  # OR member of a GitLab group
+#         github-orgs: [my-org]          # AND member of the GitHub org
+#         github-teams: [my-org/ops]     # AND member of the ops team
+#         gitlab-groups: [my-group/ops]  # AND member of a GitLab group
 #     - role: viewer
 #       match:
 #         email-domains: [example.com]   # anyone with an @example.com address

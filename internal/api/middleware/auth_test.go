@@ -10,7 +10,7 @@ import (
 )
 
 func TestAuth_Disabled_PassesThrough(t *testing.T) {
-	sm := auth.NewSessionManager("test-secret", 3600)
+	sm, _ := auth.NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	handler := Auth(sm, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify no user context is set when auth is disabled
@@ -32,7 +32,7 @@ func TestAuth_Disabled_PassesThrough(t *testing.T) {
 }
 
 func TestAuth_Enabled_NoCookie_Returns401(t *testing.T) {
-	sm := auth.NewSessionManager("test-secret", 3600)
+	sm, _ := auth.NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	handler := Auth(sm, true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called when no cookie is present")
@@ -49,7 +49,7 @@ func TestAuth_Enabled_NoCookie_Returns401(t *testing.T) {
 }
 
 func TestAuth_Enabled_ValidSession_PassesThrough(t *testing.T) {
-	sm := auth.NewSessionManager("test-secret", 3600)
+	sm, _ := auth.NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	// Create a session by recording the Set-Cookie from CreateSession.
 	sessionData := auth.SessionData{
@@ -107,7 +107,7 @@ func TestAuth_Enabled_ValidSession_PassesThrough(t *testing.T) {
 }
 
 func TestAuth_Enabled_InvalidCookie_Returns401(t *testing.T) {
-	sm := auth.NewSessionManager("test-secret", 3600)
+	sm, _ := auth.NewSessionManager("test-secret-key-that-is-32-chars", 3600, false)
 
 	handler := Auth(sm, true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called with invalid cookie")
@@ -129,7 +129,7 @@ func TestAuth_Enabled_InvalidCookie_Returns401(t *testing.T) {
 
 func TestAuth_Enabled_TamperedCookie_Returns401(t *testing.T) {
 	// Create a session with one secret
-	sm1 := auth.NewSessionManager("secret-one", 3600)
+	sm1, _ := auth.NewSessionManager("secret-one-at-least-32-chars-xxy", 3600, false)
 
 	sessionData := auth.SessionData{
 		UserID: "user-123",
@@ -150,7 +150,7 @@ func TestAuth_Enabled_TamperedCookie_Returns401(t *testing.T) {
 	}
 
 	// Verify with a different secret - should fail
-	sm2 := auth.NewSessionManager("secret-two", 3600)
+	sm2, _ := auth.NewSessionManager("secret-two-at-least-32-chars-xxy", 3600, false)
 
 	handler := Auth(sm2, true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called with tampered cookie")
@@ -170,7 +170,7 @@ func TestAuth_Enabled_TamperedCookie_Returns401(t *testing.T) {
 }
 
 func TestRequireRole_Disabled_PassesThrough(t *testing.T) {
-	handler := RequireRole("admin", false, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireRole("admin", false, RBACDeps{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -185,7 +185,7 @@ func TestRequireRole_Disabled_PassesThrough(t *testing.T) {
 }
 
 func TestRequireRole_NoSession_Returns401(t *testing.T) {
-	handler := RequireRole("admin", true, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireRole("admin", true, RBACDeps{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called without session")
 	}))
 
@@ -203,7 +203,7 @@ func TestRequireRole_NilStore_Returns403(t *testing.T) {
 	session := &auth.SessionData{UserID: "user-123", Email: "test@test.com", Name: "Test"}
 	ctx := context.WithValue(context.Background(), UserContextKey, session)
 
-	handler := RequireRole("admin", true, nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireRole("admin", true, RBACDeps{})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called with nil store")
 	}))
 
@@ -241,7 +241,7 @@ func TestRequireRole_UserHasRole_PassesThrough(t *testing.T) {
 	session := &auth.SessionData{UserID: user.ID, Email: user.Email, Name: user.Name}
 	ctx := context.WithValue(context.Background(), UserContextKey, session)
 
-	handler := RequireRole("admin", true, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireRole("admin", true, RBACDeps{Store: store})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -279,7 +279,7 @@ func TestRequireRole_UserLacksRole_Returns403(t *testing.T) {
 	session := &auth.SessionData{UserID: user.ID, Email: user.Email, Name: user.Name}
 	ctx := context.WithValue(context.Background(), UserContextKey, session)
 
-	handler := RequireRole("admin", true, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RequireRole("admin", true, RBACDeps{Store: store})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called when user lacks required role")
 	}))
 

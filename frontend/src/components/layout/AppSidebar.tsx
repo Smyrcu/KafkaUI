@@ -46,6 +46,7 @@ const clusterNavItems = [
 export function AppSidebar() {
   const { clusterName } = useParams();
   const location = useLocation();
+  const canManageClusters = useHasAction("manage_clusters");
   const canManageUsers = useHasAction("manage_users");
 
   const { data: clusters } = useQuery({
@@ -101,6 +102,7 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {canManageClusters && (
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
@@ -113,14 +115,15 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              )}
               {canManageUsers && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === "/admin/users"}
+                    isActive={location.pathname === "/settings/users"}
                     tooltip="Users"
                   >
-                    <Link to="/admin/users">
+                    <Link to="/settings/users">
                       <UserCog className="h-4 w-4" />
                       <span>Users</span>
                     </Link>
