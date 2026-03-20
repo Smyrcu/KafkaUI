@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: KafkaUI API
   description: REST API for managing Apache Kafka clusters
-  version: 0.12.0
+  version: 0.12.1
 
 servers:
   - url: /api/v1

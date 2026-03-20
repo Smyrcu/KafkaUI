@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -95,20 +96,22 @@ func parseAllMetrics(r io.Reader) (Snapshot, error) {
 }
 
 func extractSampleValue(m *dto.Metric) float64 {
+	v := 0.0
 	if g := m.GetGauge(); g != nil {
-		return g.GetValue()
+		v = g.GetValue()
+	} else if c := m.GetCounter(); c != nil {
+		v = c.GetValue()
+	} else if u := m.GetUntyped(); u != nil {
+		v = u.GetValue()
+	} else if s := m.GetSummary(); s != nil {
+		v = s.GetSampleSum()
+	} else if h := m.GetHistogram(); h != nil {
+		v = h.GetSampleSum()
 	}
-	if c := m.GetCounter(); c != nil {
-		return c.GetValue()
+	// Prometheus can return NaN (e.g. rate() without data) or ±Inf.
+	// Go's encoding/json rejects these values, so replace with 0.
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0
 	}
-	if u := m.GetUntyped(); u != nil {
-		return u.GetValue()
-	}
-	if s := m.GetSummary(); s != nil {
-		return s.GetSampleSum()
-	}
-	if h := m.GetHistogram(); h != nil {
-		return h.GetSampleSum()
-	}
-	return 0
+	return v
 }
