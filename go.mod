@@ -24,9 +24,11 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/linkedin/goavro/v2 v2.15.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
