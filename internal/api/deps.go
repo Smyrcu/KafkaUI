@@ -37,4 +37,3 @@ type RouterDeps struct {
 	SerDeChains        map[string]kafka.SerDeChain
 	LDAPAuth           *auth.LDAPAuthenticator
 }
-}
