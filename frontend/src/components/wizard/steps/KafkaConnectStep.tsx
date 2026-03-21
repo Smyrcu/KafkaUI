@@ -25,6 +25,9 @@ export function KafkaConnectStep({ kafkaConnect, onChange }: KafkaConnectStepPro
   return (
     <div className="space-y-4">
       <Label>Kafka Connect Clusters</Label>
+      {entries.length === 0 && (
+        <p className="text-sm text-muted-foreground">No Connect clusters configured. Click below to add one, or skip this step.</p>
+      )}
       {entries.map((entry, i) => (
         <div key={i} className="flex gap-2 items-end">
           <div className="flex-1 space-y-1">

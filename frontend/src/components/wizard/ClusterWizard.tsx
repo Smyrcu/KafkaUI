@@ -101,6 +101,19 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
     }
   };
 
+  const handleNext = () => {
+    if (!isLastStep && canNext) {
+      dispatch({ type: "SET_STEP", step: step + 1 });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !isLastStep && canNext) {
+      e.preventDefault();
+      handleNext();
+    }
+  };
+
   const renderStep = () => {
     switch (step) {
       case 0:
@@ -130,7 +143,7 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Cluster" : "Add Cluster"}</DialogTitle>
         </DialogHeader>
