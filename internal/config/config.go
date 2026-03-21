@@ -140,6 +140,18 @@ type ClusterConfig struct {
 	KafkaConnect     []KafkaConnectConfig `yaml:"kafka-connect"`
 	KSQL             KSQLConfig           `yaml:"ksql"`
 	Metrics          MetricsConfig        `yaml:"metrics"`
+	SerDe            SerDeConfig          `yaml:"serde"`
+}
+
+type SerDeConfig struct {
+	Default string      `yaml:"default"` // "auto" (default), "json", "string", "avro", "protobuf"
+	Rules   []SerDeRule `yaml:"rules"`
+}
+
+type SerDeRule struct {
+	TopicPattern      string `yaml:"topic-pattern"`
+	KeyDeserializer   string `yaml:"key-deserializer"`
+	ValueDeserializer string `yaml:"value-deserializer"`
 }
 
 type MetricsConfig struct {
