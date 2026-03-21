@@ -270,6 +270,12 @@ export interface AdminClusterInfo {
   name: string;
   bootstrapServers: string;
   dynamic: boolean;
+  tls?: { enabled: boolean; caFile?: string };
+  sasl?: { mechanism: string; username: string; password: string };
+  schemaRegistry?: { url: string };
+  kafkaConnect?: { name: string; url: string }[];
+  ksql?: { url: string };
+  metrics?: { url: string };
 }
 
 export interface AdminClusterList {

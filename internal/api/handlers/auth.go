@@ -137,7 +137,7 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		writeInternalError(w, "upserting user", err)
 		return
 	}
-	if h.userStore != nil {
+	if h.userStore != nil && h.basic != nil {
 		configRoles := h.basic.ConfigRoles(req.Username)
 		if len(configRoles) > 0 {
 			if dbRoles, err := h.userStore.GetRoles(user.ID); err == nil && len(dbRoles) == 0 {

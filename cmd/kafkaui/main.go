@@ -137,13 +137,22 @@ func initProviders(cfg *config.Config, logger *slog.Logger) (map[string]auth.Ide
 	return providers, providerList
 }
 
-// initBasicAuth creates the basic authenticator and rate limiter when auth types include "basic".
-func initBasicAuth(cfg *config.Config, logger *slog.Logger) (*auth.BasicAuthenticator, *auth.LoginRateLimiter) {
+// initBasicAuth creates the basic authenticator when auth types include "basic".
+func initBasicAuth(cfg *config.Config, logger *slog.Logger) *auth.BasicAuthenticator {
 	if !cfg.Auth.Enabled || !slices.Contains(cfg.Auth.Types, "basic") {
-		return nil, nil
+		return nil
 	}
 	basicAuth := auth.NewBasicAuthenticator(cfg.Auth.Basic.Users)
+	logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
+	return basicAuth
+}
 
+// initLoginRateLimiter creates a rate limiter for credential-based auth (basic or ldap).
+func initLoginRateLimiter(cfg *config.Config) *auth.LoginRateLimiter {
+	hasCredentialAuth := slices.Contains(cfg.Auth.Types, "basic") || slices.Contains(cfg.Auth.Types, "ldap")
+	if !cfg.Auth.Enabled || !hasCredentialAuth {
+		return nil
+	}
 	maxAttempts := cfg.Auth.Basic.RateLimit.MaxAttempts
 	if maxAttempts == 0 {
 		maxAttempts = 5
@@ -152,10 +161,7 @@ func initBasicAuth(cfg *config.Config, logger *slog.Logger) (*auth.BasicAuthenti
 	if windowSecs == 0 {
 		windowSecs = 60
 	}
-	rateLimiter := auth.NewLoginRateLimiter(maxAttempts, time.Duration(windowSecs)*time.Second)
-
-	logger.Info("basic authentication enabled", "users", len(cfg.Auth.Basic.Users))
-	return basicAuth, rateLimiter
+	return auth.NewLoginRateLimiter(maxAttempts, time.Duration(windowSecs)*time.Second)
 }
 
 // initMetrics creates per-cluster metrics scrapers, a shared store, and
@@ -237,7 +243,8 @@ func main() {
 	}
 
 	providers, providerList := initProviders(cfg, logger)
-	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
+	basicAuth := initBasicAuth(cfg, logger)
+	rateLimiter := initLoginRateLimiter(cfg)
 
 	// Initialize LDAP authenticator if configured
 	var ldapAuth *auth.LDAPAuthenticator

@@ -130,6 +130,10 @@ func parseMessageIndex(data []byte) ([]int, int, error) {
 		return []int{0}, totalRead, nil
 	}
 
+	const maxMessageIndexCount = 100
+	if count > maxMessageIndexCount {
+		return nil, 0, fmt.Errorf("message index count %d exceeds maximum %d", count, maxMessageIndexCount)
+	}
 	indices := make([]int, count)
 	for i := uint64(0); i < count; i++ {
 		if totalRead >= len(data) {

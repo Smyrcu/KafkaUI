@@ -52,3 +52,4 @@ code-review-*.md
 
 # Go vendor
 /vendor/
+dynamic.yaml

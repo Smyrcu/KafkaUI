@@ -92,7 +92,9 @@ func (a *LDAPAuthenticator) Authenticate(username, password string) (*UserIdenti
 	name := userEntry.GetAttributeValue(nameAttr)
 
 	// Re-bind as service account for group search (user bind may lack search permissions)
-	_ = conn.Bind(a.cfg.BindDN, a.cfg.BindPassword)
+	if err := conn.Bind(a.cfg.BindDN, a.cfg.BindPassword); err != nil {
+		a.logger.Error("LDAP service re-bind failed for group search", "error", err)
+	}
 
 	// Extract groups
 	var groups []string
@@ -119,9 +121,16 @@ func (a *LDAPAuthenticator) searchGroups(conn *ldap.Conn, userDN string) []strin
 	if filter == "" {
 		filter = "(&(objectClass=groupOfNames)(member={dn}))"
 	}
-	// DN values in LDAP filters should NOT be escaped with EscapeFilter
-	// because = and , are valid DN characters, not special filter characters.
-	filter = strings.ReplaceAll(filter, "{dn}", userDN)
+	// Escape LDAP filter special characters (RFC 4515: *, (, ), \, NUL)
+	// but NOT DN structural characters (= and ,) which are valid in member DN values.
+	// ldap.EscapeFilter is too aggressive for DN values, so we do selective escaping.
+	escapedDN := userDN
+	escapedDN = strings.ReplaceAll(escapedDN, `\`, `\5c`)
+	escapedDN = strings.ReplaceAll(escapedDN, `*`, `\2a`)
+	escapedDN = strings.ReplaceAll(escapedDN, `(`, `\28`)
+	escapedDN = strings.ReplaceAll(escapedDN, `)`, `\29`)
+	escapedDN = strings.ReplaceAll(escapedDN, "\x00", `\00`)
+	filter = strings.ReplaceAll(filter, "{dn}", escapedDN)
 
 	result, err := conn.Search(ldap.NewSearchRequest(
 		a.cfg.GroupSearchBase,

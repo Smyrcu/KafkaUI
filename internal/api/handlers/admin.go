@@ -18,9 +18,15 @@ type AdminHandler struct {
 }
 
 type AdminClusterInfo struct {
-	Name             string `json:"name"`
-	BootstrapServers string `json:"bootstrapServers"`
-	Dynamic          bool   `json:"dynamic"`
+	Name             string                      `json:"name"`
+	BootstrapServers string                      `json:"bootstrapServers"`
+	Dynamic          bool                        `json:"dynamic"`
+	TLS              config.TLSConfig            `json:"tls,omitempty"`
+	SASL             config.SASLConfig           `json:"sasl,omitempty"`
+	SchemaRegistry   config.SchemaRegistryConfig `json:"schemaRegistry,omitempty"`
+	KafkaConnect     []config.KafkaConnectConfig `json:"kafkaConnect,omitempty"`
+	KSQL             config.KSQLConfig           `json:"ksql,omitempty"`
+	Metrics          config.MetricsConfig        `json:"metrics,omitempty"`
 }
 
 type AdminClusterList struct {
@@ -71,6 +77,12 @@ func (h *AdminHandler) ListClusters(w http.ResponseWriter, r *http.Request) {
 			Name:             cc.Name,
 			BootstrapServers: cc.BootstrapServers,
 			Dynamic:          false,
+			TLS:              cc.TLS,
+			SASL:             cc.SASL,
+			SchemaRegistry:   cc.SchemaRegistry,
+			KafkaConnect:     cc.KafkaConnect,
+			KSQL:             cc.KSQL,
+			Metrics:          cc.Metrics,
 		})
 	}
 
@@ -81,6 +93,12 @@ func (h *AdminHandler) ListClusters(w http.ResponseWriter, r *http.Request) {
 				Name:             cc.Name,
 				BootstrapServers: cc.BootstrapServers,
 				Dynamic:          true,
+				TLS:              cc.TLS,
+				SASL:             cc.SASL,
+				SchemaRegistry:   cc.SchemaRegistry,
+				KafkaConnect:     cc.KafkaConnect,
+				KSQL:             cc.KSQL,
+				Metrics:          cc.Metrics,
 			})
 		}
 	}

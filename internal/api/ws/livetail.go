@@ -137,17 +137,20 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 				}
 				key := string(r.Key)
 				value := string(r.Value)
+				var keyFmt, valFmt string
 				if chain, ok := h.serdeChains[clusterName]; ok && chain != nil {
-					key = chain.Deserialize(topicName, r.Key, headers)
-					value = chain.Deserialize(topicName, r.Value, headers)
+					key, keyFmt = chain.DeserializeWithFormat(topicName, r.Key, headers)
+					value, valFmt = chain.DeserializeWithFormat(topicName, r.Value, headers)
 				}
 				msg := kafka.MessageRecord{
-					Partition: r.Partition,
-					Offset:    r.Offset,
-					Timestamp: r.Timestamp,
-					Key:       key,
-					Value:     value,
-					Headers:   headers,
+					Partition:   r.Partition,
+					Offset:      r.Offset,
+					Timestamp:   r.Timestamp,
+					Key:         key,
+					Value:       value,
+					Headers:     headers,
+					KeyFormat:   keyFmt,
+					ValueFormat: valFmt,
 				}
 
 				// Apply CEL filter if provided

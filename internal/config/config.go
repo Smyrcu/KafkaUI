@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -252,12 +253,12 @@ func (c *Config) Validate() error {
 	}
 
 	if len(c.Auth.Types) == 0 {
-		return fmt.Errorf("auth.enabled is true but auth.types is empty — specify at least one of: basic, oidc, oauth2")
+		return fmt.Errorf("auth.enabled is true but auth.types is empty — specify at least one of: %s", strings.Join(validAuthTypes, ", "))
 	}
 
 	for _, t := range c.Auth.Types {
 		if !slices.Contains(validAuthTypes, t) {
-			return fmt.Errorf("auth.types contains unrecognised value %q — valid values are: basic, oidc, oauth2", t)
+			return fmt.Errorf("auth.types contains unrecognised value %q — valid values are: %s", t, strings.Join(validAuthTypes, ", "))
 		}
 	}
 

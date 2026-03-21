@@ -115,20 +115,21 @@ export function SettingsClustersPage() {
         </div>
       )}
 
-      {/* Cluster Wizard */}
+      {/* Cluster Wizard — key forces remount to reset state */}
       <ClusterWizard
+        key={wizardOpen ? "add" : "closed"}
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         onSaved={handleSaved}
       />
 
-      {/* Edit Wizard */}
+      {/* Edit Wizard — note: only name+bootstrapServers available from list endpoint */}
       {editCluster && (
         <ClusterWizard
           open
           onClose={() => setEditCluster(null)}
           onSaved={handleSaved}
-          initialData={{ name: editCluster.name, bootstrapServers: editCluster.bootstrapServers }}
+          initialData={editCluster}
         />
       )}
 

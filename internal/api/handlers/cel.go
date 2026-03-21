@@ -25,7 +25,7 @@ func (h *CELHandler) Validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(req.Expression) > maxCELExpressionLen {
-		writeError(w, http.StatusBadRequest, "expression exceeds maximum length of 1000 characters")
+		writeError(w, http.StatusBadRequest, "expression exceeds maximum length of 1000 bytes")
 		return
 	}
 	if _, err := celfilter.NewFilter(req.Expression); err != nil {
