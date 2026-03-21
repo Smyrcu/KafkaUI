@@ -22,6 +22,7 @@ type AuthHandlerDeps struct {
 	Providers    map[string]auth.IdentityProvider
 	ProviderList []auth.ProviderInfo
 	Basic        *auth.BasicAuthenticator
+	LDAP         *auth.LDAPAuthenticator
 	RateLimiter  *auth.LoginRateLimiter
 	Sessions     *auth.SessionManager
 	UserStore    *auth.UserStore
@@ -38,6 +39,7 @@ type AuthHandler struct {
 	providers    map[string]auth.IdentityProvider
 	providerList []auth.ProviderInfo
 	basic        *auth.BasicAuthenticator
+	ldap         *auth.LDAPAuthenticator
 	rateLimiter  *auth.LoginRateLimiter
 	sessions     *auth.SessionManager
 	userStore    *auth.UserStore
@@ -55,6 +57,7 @@ func NewAuthHandler(deps AuthHandlerDeps) *AuthHandler {
 		providers:    deps.Providers,
 		providerList: deps.ProviderList,
 		basic:        deps.Basic,
+		ldap:         deps.LDAP,
 		rateLimiter:  deps.RateLimiter,
 		sessions:     deps.Sessions,
 		userStore:    deps.UserStore,
@@ -78,8 +81,8 @@ func (h *AuthHandler) hasExternalAuth() bool {
 }
 
 func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
-	if !h.enabled || !h.hasType("basic") {
-		writeError(w, http.StatusNotFound, "basic auth not enabled")
+	if !h.enabled || (!h.hasType("basic") && !h.hasType("ldap")) {
+		writeError(w, http.StatusNotFound, "credential auth not enabled")
 		return
 	}
 
@@ -109,8 +112,17 @@ func (h *AuthHandler) LoginBasic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity, err := h.basic.Authenticate(req.Username, req.Password)
-	if err != nil {
+	// Try LDAP first, then fall back to basic auth
+	var identity *auth.UserIdentity
+	var authErr error
+
+	if h.hasType("ldap") && h.ldap != nil {
+		identity, authErr = h.ldap.Authenticate(req.Username, req.Password)
+	}
+	if (authErr != nil || identity == nil) && h.hasType("basic") && h.basic != nil {
+		identity, authErr = h.basic.Authenticate(req.Username, req.Password)
+	}
+	if authErr != nil || identity == nil {
 		h.logger.Warn("login failed", "username", req.Username, "ip", ip)
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return

@@ -76,6 +76,12 @@ func matchesRule(match config.AutoAssignmentMatch, identity *UserIdentity) bool 
 			matched++
 		}
 	}
+	if len(match.LDAPGroups) > 0 {
+		conditions++
+		if hasOverlap(identity.Orgs, match.LDAPGroups) {
+			matched++
+		}
+	}
 	return conditions > 0 && matched == conditions
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -45,10 +46,38 @@ type AuthConfig struct {
 	OIDC           OIDCConfig           `yaml:"oidc"`
 	OAuth2         OAuth2Config         `yaml:"oauth2"`
 	Basic          BasicAuthConfig      `yaml:"basic"`
+	LDAP           LDAPConfig           `yaml:"ldap"`
 	Session        SessionConfig        `yaml:"session"`
 	RBAC           RBACConfig           `yaml:"rbac"`
 	AutoAssignment []AutoAssignmentRule `yaml:"auto-assignment"`
 	Storage        StorageConfig        `yaml:"storage"`
+}
+
+type LDAPConfig struct {
+	URL               string `yaml:"url"`
+	StartTLS          bool   `yaml:"start-tls"`
+	ConnectionTimeout string `yaml:"connection-timeout"`
+	BindDN            string `yaml:"bind-dn"`
+	BindPassword      string `yaml:"bind-password"`
+	SearchBase        string `yaml:"search-base"`
+	SearchFilter      string `yaml:"search-filter"`
+	EmailAttribute    string `yaml:"email-attribute"`
+	NameAttribute     string `yaml:"name-attribute"`
+	GroupAttribute    string `yaml:"group-attribute"`
+	GroupSearchBase   string `yaml:"group-search-base"`
+	GroupSearchFilter string `yaml:"group-search-filter"`
+}
+
+// ConnectionTimeoutDuration returns the parsed timeout or 10s default.
+func (c LDAPConfig) ConnectionTimeoutDuration() time.Duration {
+	if c.ConnectionTimeout == "" {
+		return 10 * time.Second
+	}
+	d, err := time.ParseDuration(c.ConnectionTimeout)
+	if err != nil {
+		return 10 * time.Second
+	}
+	return d
 }
 
 type BasicAuthConfig struct {
@@ -125,6 +154,7 @@ type AutoAssignmentMatch struct {
 	GitHubOrgs    []string `yaml:"github-orgs"`
 	GitHubTeams   []string `yaml:"github-teams"`
 	GitLabGroups  []string `yaml:"gitlab-groups"`
+	LDAPGroups    []string `yaml:"ldap-groups"`
 }
 
 type StorageConfig struct {
@@ -212,7 +242,7 @@ func Load(path string) (*Config, error) {
 }
 
 // validAuthTypes is the set of recognised authentication type strings.
-var validAuthTypes = []string{"basic", "oidc", "oauth2"}
+var validAuthTypes = []string{"basic", "oidc", "oauth2", "ldap"}
 
 // Validate checks that the configuration is semantically consistent.
 // It returns a descriptive error for the first violation found.
@@ -250,6 +280,23 @@ func (c *Config) Validate() error {
 			}
 			if p.ClientID == "" {
 				return fmt.Errorf("auth.oidc.providers[%d] (%q): client-id must not be empty", i, p.Name)
+			}
+		}
+	}
+
+	if slices.Contains(c.Auth.Types, "ldap") {
+		if c.Auth.LDAP.URL == "" {
+			return fmt.Errorf("auth.types includes \"ldap\" but auth.ldap.url is empty")
+		}
+		if c.Auth.LDAP.BindDN == "" {
+			return fmt.Errorf("auth.types includes \"ldap\" but auth.ldap.bind-dn is empty")
+		}
+		if c.Auth.LDAP.SearchBase == "" {
+			return fmt.Errorf("auth.types includes \"ldap\" but auth.ldap.search-base is empty")
+		}
+		if c.Auth.LDAP.ConnectionTimeout != "" {
+			if _, err := time.ParseDuration(c.Auth.LDAP.ConnectionTimeout); err != nil {
+				return fmt.Errorf("auth.ldap.connection-timeout %q is not a valid duration", c.Auth.LDAP.ConnectionTimeout)
 			}
 		}
 	}

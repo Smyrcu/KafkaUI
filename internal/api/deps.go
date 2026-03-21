@@ -35,4 +35,6 @@ type RouterDeps struct {
 	TrustProxy         bool
 	CORSOrigins        []string
 	SerDeChains        map[string]kafka.SerDeChain
+	LDAPAuth           *auth.LDAPAuthenticator
+}
 }
