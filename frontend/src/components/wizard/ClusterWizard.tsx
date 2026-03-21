@@ -1,5 +1,5 @@
 import { useReducer } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { api, type AddClusterRequest, type TestConnectionResult } from "@/lib/api";
 import { WizardStepper } from "./WizardStepper";
@@ -130,20 +130,20 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Cluster" : "Add Cluster"}</DialogTitle>
         </DialogHeader>
 
         <WizardStepper steps={STEPS} currentStep={step} onStepClick={(s) => dispatch({ type: "SET_STEP", step: s })} />
 
-        <div className="min-h-[200px] py-2">
+        <div className="min-h-[180px] py-4">
           {renderStep()}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <DialogFooter className="flex justify-between sm:justify-between">
+        <div className="flex justify-between pt-2 border-t">
           <div>
             {step > 0 && (
               <Button variant="outline" onClick={() => dispatch({ type: "SET_STEP", step: step - 1 })}>
@@ -168,7 +168,7 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
               </Button>
             )}
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
