@@ -43,7 +43,7 @@ func mustUpsertUser(t *testing.T, store *auth.UserStore, externalID, email, name
 
 // newAdminUsersRouter wires up the AdminUsersHandler on a chi router.
 func newAdminUsersRouter(store *auth.UserStore) chi.Router {
-	h := NewAdminUsersHandler(store)
+	h := NewAdminUsersHandler(store, nil, "")
 	r := chi.NewRouter()
 	r.Get("/admin/users", h.List)
 	r.Get("/admin/users/{id}", h.Get)
