@@ -91,6 +91,9 @@ func (a *LDAPAuthenticator) Authenticate(username, password string) (*UserIdenti
 	email := userEntry.GetAttributeValue(emailAttr)
 	name := userEntry.GetAttributeValue(nameAttr)
 
+	// Re-bind as service account for group search (user bind may lack search permissions)
+	_ = conn.Bind(a.cfg.BindDN, a.cfg.BindPassword)
+
 	// Extract groups
 	var groups []string
 	if a.cfg.GroupSearchBase != "" {
@@ -116,7 +119,9 @@ func (a *LDAPAuthenticator) searchGroups(conn *ldap.Conn, userDN string) []strin
 	if filter == "" {
 		filter = "(&(objectClass=groupOfNames)(member={dn}))"
 	}
-	filter = strings.ReplaceAll(filter, "{dn}", ldap.EscapeFilter(userDN))
+	// DN values in LDAP filters should NOT be escaped with EscapeFilter
+	// because = and , are valid DN characters, not special filter characters.
+	filter = strings.ReplaceAll(filter, "{dn}", userDN)
 
 	result, err := conn.Search(ldap.NewSearchRequest(
 		a.cfg.GroupSearchBase,
