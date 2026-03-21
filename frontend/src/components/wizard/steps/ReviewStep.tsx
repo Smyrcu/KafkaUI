@@ -71,6 +71,9 @@ export function ReviewStep({ data, testResult, testing, onTest }: ReviewStepProp
             )}
           </div>
         )}
+        {!testResult && !testing && (
+          <p className="text-xs text-amber-500">Test connection before saving to verify your configuration</p>
+        )}
       </div>
     </div>
   );

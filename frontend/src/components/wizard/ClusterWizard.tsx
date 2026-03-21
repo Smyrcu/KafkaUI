@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { api, type AddClusterRequest, type TestConnectionResult } from "@/lib/api";
 import { WizardStepper } from "./WizardStepper";
-import { ConnectionStep } from "./steps/ConnectionStep";
+import { ConnectionStep, validateBootstrap, validateName } from "./steps/ConnectionStep";
 import { SecurityStep } from "./steps/SecurityStep";
 import { AuthStep } from "./steps/AuthStep";
 import { SchemaRegistryStep } from "./steps/SchemaRegistryStep";
@@ -67,7 +67,9 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
 
   const { step, data, testResult, testing, saving, error } = state;
   const isEdit = !!initialData;
-  const canNext = step === 0 ? data.name.trim() !== "" && data.bootstrapServers.trim() !== "" : true;
+  const canNext = step === 0
+    ? data.name.trim() !== "" && data.bootstrapServers.trim() !== "" && !validateName(data.name) && !validateBootstrap(data.bootstrapServers)
+    : true;
   const isOptionalStep = !REQUIRED_STEPS.has(step);
   const isLastStep = step === STEPS.length - 1;
 
