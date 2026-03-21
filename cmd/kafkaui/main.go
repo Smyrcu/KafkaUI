@@ -22,6 +22,8 @@ import (
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
 	"github.com/Smyrcu/KafkaUI/internal/masking"
 	"github.com/Smyrcu/KafkaUI/internal/metrics"
+	"github.com/Smyrcu/KafkaUI/internal/schema"
+	"github.com/Smyrcu/KafkaUI/internal/serde"
 )
 
 // spaHandler serves static files and falls back to index.html for client-side routes.
@@ -265,6 +267,21 @@ func main() {
 		rbac = auth.NewRBAC(cfg.Auth.RBAC)
 	}
 
+	// Build per-cluster SerDe chains
+	serdeChains := make(map[string]kafka.SerDeChain)
+	for _, cc := range cfg.Clusters {
+		var schemaClient *schema.Client
+		if cc.SchemaRegistry.URL != "" {
+			schemaClient = schema.NewClient(cc.SchemaRegistry.URL)
+		}
+		chain := serde.BuildChain(cc.SerDe, schemaClient)
+		serdeChains[cc.Name] = chain
+		// Also set the chain on the kafka client for ConsumeMessages deserialization
+		if client, ok := registry.Get(cc.Name); ok {
+			client.SetSerDe(chain)
+		}
+	}
+
 	router := api.NewRouter(api.RouterDeps{
 		Registry:           registry,
 		Logger:             logger,
@@ -286,6 +303,7 @@ func main() {
 		DefaultRole:        cfg.Auth.DefaultRole,
 		TrustProxy:         cfg.Server.TrustProxy,
 		CORSOrigins:        cfg.Server.CORSOrigins,
+		SerDeChains:        serdeChains,
 	})
 
 	frontendContent, err := fs.Sub(fe.FS, "dist")

@@ -18,7 +18,7 @@ import (
 
 func TestLiveTailHandler_ClusterNotFound(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testutil.TestLogger())
+	h := NewLiveTailHandler(reg, testutil.TestLogger(), nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters/nonexistent/topics/test/live", nil)
 	rctx := chi.NewRouteContext()
@@ -40,7 +40,7 @@ func TestLiveTailHandler_ClusterNotFound(t *testing.T) {
 
 func TestLiveTailHandler_NonWebSocketRequest(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testutil.TestLogger())
+	h := NewLiveTailHandler(reg, testutil.TestLogger(), nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters/alpha/topics/test/live", nil)
 	rctx := chi.NewRouteContext()
@@ -60,7 +60,7 @@ func TestLiveTailHandler_NonWebSocketRequest(t *testing.T) {
 
 func TestLiveTailHandler_MissingClusterParam(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testutil.TestLogger())
+	h := NewLiveTailHandler(reg, testutil.TestLogger(), nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/ws/clusters//topics/test/live", nil)
 	// Set up route context with empty clusterName.
@@ -81,7 +81,7 @@ func TestLiveTailHandler_MissingClusterParam(t *testing.T) {
 func TestNewLiveTailHandler(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
 	logger := testutil.TestLogger()
-	h := NewLiveTailHandler(reg, logger)
+	h := NewLiveTailHandler(reg, logger, nil)
 
 	if h == nil {
 		t.Fatal("expected non-nil handler")
@@ -96,7 +96,7 @@ func TestNewLiveTailHandler(t *testing.T) {
 
 func TestLiveTailHandler_WebSocketUpgrade(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testutil.TestLogger())
+	h := NewLiveTailHandler(reg, testutil.TestLogger(), nil)
 
 	// Create a test server with chi router to serve the WebSocket handler.
 	r := chi.NewRouter()
@@ -141,7 +141,7 @@ func TestLiveTailHandler_WebSocketUpgrade(t *testing.T) {
 
 func TestLiveTailHandler_WebSocketClusterNotFound(t *testing.T) {
 	reg := testutil.MustCreateRegistry(t)
-	h := NewLiveTailHandler(reg, testutil.TestLogger())
+	h := NewLiveTailHandler(reg, testutil.TestLogger(), nil)
 
 	r := chi.NewRouter()
 	r.Get("/ws/clusters/{clusterName}/topics/{topicName}/live", h.Handle)

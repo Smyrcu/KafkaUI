@@ -44,7 +44,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	userHandler := handlers.NewUserHandler(deps.Registry)
 	dashboardHandler := handlers.NewDashboardHandler(deps.Registry)
 	metricsHandler := handlers.NewMetricsHandler(deps.MetricsStore)
-	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger)
+	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger, deps.SerDeChains)
 
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
 	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore)
