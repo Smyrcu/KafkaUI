@@ -48,7 +48,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	celHandler := handlers.NewCELHandler()
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
-	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore)
+	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore, deps.AutoAssignment, deps.DefaultRole)
 	healthHandler := handlers.NewHealthHandler(deps.Registry)
 
 	authHandler := handlers.NewAuthHandler(handlers.AuthHandlerDeps{

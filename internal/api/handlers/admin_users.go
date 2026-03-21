@@ -10,6 +10,7 @@ import (
 
 	"github.com/Smyrcu/KafkaUI/internal/api/middleware"
 	"github.com/Smyrcu/KafkaUI/internal/auth"
+	"github.com/Smyrcu/KafkaUI/internal/config"
 )
 
 const (
@@ -33,11 +34,13 @@ func validateRole(role string) error {
 }
 
 type AdminUsersHandler struct {
-	store *auth.UserStore
+	store       *auth.UserStore
+	autoRules   []config.AutoAssignmentRule
+	defaultRole string
 }
 
-func NewAdminUsersHandler(store *auth.UserStore) *AdminUsersHandler {
-	return &AdminUsersHandler{store: store}
+func NewAdminUsersHandler(store *auth.UserStore, autoRules []config.AutoAssignmentRule, defaultRole string) *AdminUsersHandler {
+	return &AdminUsersHandler{store: store, autoRules: autoRules, defaultRole: defaultRole}
 }
 
 func (h *AdminUsersHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +52,18 @@ func (h *AdminUsersHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeInternalError(w, "listing users", err)
 		return
+	}
+	// Resolve effective roles (DB + auto-assignment + default) for display
+	for i := range users {
+		identity := &auth.UserIdentity{
+			ExternalID: users[i].ExternalID,
+			Email:      users[i].Email,
+			Orgs:       users[i].Orgs,
+			Teams:      users[i].Teams,
+		}
+		if resolved, err := auth.ResolveRoles(h.store, users[i].ID, identity, h.autoRules, h.defaultRole); err == nil {
+			users[i].Roles = resolved
+		}
 	}
 	writeJSON(w, http.StatusOK, users)
 }
