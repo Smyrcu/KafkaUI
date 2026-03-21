@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useHasAction } from "@/hooks/usePermissions";
@@ -17,7 +17,7 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { TableSkeleton } from "@/components/PageSkeleton";
-import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter, Download } from "lucide-react";
+import { Play, Square, Send, Plus, Trash2, ChevronDown, ChevronRight, MessageSquare, Filter, Download, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { rowClassName } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/error-utils";
 
@@ -37,6 +37,33 @@ export function TopicMessagesPage() {
   const [fetchNonce, setFetchNonce] = useState(0);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [celFilter, setCelFilter] = useState("");
+  const [celValid, setCelValid] = useState<{ valid: boolean; error?: string } | null>(null);
+  const [celValidating, setCelValidating] = useState(false);
+
+  // Debounced CEL filter validation
+  const validateCel = useCallback((expr: string) => {
+    if (!expr.trim()) {
+      setCelValid(null);
+      return;
+    }
+    setCelValidating(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await api.cel.validate(expr);
+        setCelValid(result);
+      } catch {
+        setCelValid(null);
+      } finally {
+        setCelValidating(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const cleanup = validateCel(celFilter);
+    return cleanup;
+  }, [celFilter, validateCel]);
 
   // Live tail
   const wsUrl = clusterName && topicName
@@ -239,14 +266,30 @@ export function TopicMessagesPage() {
       <div className="flex flex-col gap-1.5 mb-4">
         <div className="flex items-center gap-2">
           <Label className="text-xs flex items-center gap-1 shrink-0"><Filter className="h-3 w-3" />CEL Filter</Label>
-          <Input
-            className="font-mono text-sm"
-            placeholder='value.status == "ERROR" && key.contains("order")'
-            value={celFilter}
-            onChange={(e) => setCelFilter(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !isLiveTail) handleFetch(); }}
-          />
+          <div className="relative flex-1">
+            <Input
+              className="font-mono text-sm pr-8"
+              placeholder='value.status == "ERROR" && key.contains("order")'
+              value={celFilter}
+              onChange={(e) => setCelFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !isLiveTail) handleFetch(); }}
+            />
+            {celFilter && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                {celValidating ? (
+                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+                ) : celValid?.valid ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : celValid && !celValid.valid ? (
+                  <XCircle className="h-4 w-4 text-destructive" />
+                ) : null}
+              </div>
+            )}
+          </div>
         </div>
+        {celValid && !celValid.valid && celValid.error && (
+          <p className="text-xs text-destructive ml-[4.5rem] font-mono">{celValid.error}</p>
+        )}
         <p className="text-xs text-muted-foreground ml-[4.5rem]">
           Fields: <code className="bg-muted px-1 rounded">key</code> <code className="bg-muted px-1 rounded">value</code> <code className="bg-muted px-1 rounded">headers</code> <code className="bg-muted px-1 rounded">partition</code> <code className="bg-muted px-1 rounded">offset</code> <code className="bg-muted px-1 rounded">timestamp</code>
           {" · "}JSON values: <code className="bg-muted px-1 rounded">value.field == "x"</code>

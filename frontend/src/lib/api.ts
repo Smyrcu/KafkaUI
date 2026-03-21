@@ -366,6 +366,9 @@ export const api = {
       return request<MetricsResponse>(`/clusters/${cluster}/metrics${qs ? `?${qs}` : ''}`);
     },
   },
+  cel: {
+    validate: (expression: string) => request<{ valid: boolean; error?: string }>('/cel/validate', { method: 'POST', body: JSON.stringify({ expression }) }),
+  },
   auth: {
     status: () => request<AuthStatus>('/auth/status'),
     me: () => request<AuthUser>('/auth/me'),
