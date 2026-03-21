@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Smyrcu/KafkaUI/internal/httpclient"
 )
 
 type Client struct {
-	http *httpclient.Client
+	http        *httpclient.Client
+	schemaCache sync.Map // schema ID (int) -> schema JSON (string); immutable, never expires
 }
 
 type SubjectInfo struct {
@@ -192,4 +194,22 @@ func (c *Client) getCompatibility(ctx context.Context, escapedSubject string) st
 	}
 
 	return ""
+}
+
+// GetSchemaByID fetches a schema by its global ID. Results are cached
+// indefinitely because schema IDs are immutable in Confluent Schema Registry.
+func (c *Client) GetSchemaByID(ctx context.Context, id int) (string, error) {
+	if cached, ok := c.schemaCache.Load(id); ok {
+		return cached.(string), nil
+	}
+
+	var resp struct {
+		Schema string `json:"schema"`
+	}
+	if err := c.http.Do(ctx, "GET", fmt.Sprintf("/schemas/ids/%d", id), nil, &resp); err != nil {
+		return "", fmt.Errorf("get schema by id %d: %w", id, err)
+	}
+
+	c.schemaCache.Store(id, resp.Schema)
+	return resp.Schema, nil
 }
