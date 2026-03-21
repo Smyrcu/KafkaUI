@@ -19,6 +19,18 @@ type Client struct {
 	admin  *kadm.Client
 	name   string
 	config config.ClusterConfig
+	serde  SerDeChain // optional, nil-safe
+}
+
+// SerDeChain deserializes raw bytes into display strings.
+// Extracted as interface to avoid circular imports with internal/serde.
+type SerDeChain interface {
+	Deserialize(topic string, data []byte, headers map[string]string) string
+}
+
+// SetSerDe sets the optional SerDe chain for message deserialization.
+func (c *Client) SetSerDe(chain SerDeChain) {
+	c.serde = chain
 }
 
 type BrokerInfo struct {
@@ -413,13 +425,20 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 			if len(records) >= req.Limit {
 				return
 			}
+			hdrs := recordHeaders(r)
+			key := string(r.Key)
+			value := string(r.Value)
+			if c.serde != nil {
+				key = c.serde.Deserialize(r.Topic, r.Key, hdrs)
+				value = c.serde.Deserialize(r.Topic, r.Value, hdrs)
+			}
 			records = append(records, MessageRecord{
 				Partition: r.Partition,
 				Offset:    r.Offset,
 				Timestamp: r.Timestamp,
-				Key:       string(r.Key),
-				Value:     string(r.Value),
-				Headers:   recordHeaders(r),
+				Key:       key,
+				Value:     value,
+				Headers:   hdrs,
 			})
 		})
 		// No new messages — topic exhausted, stop waiting.

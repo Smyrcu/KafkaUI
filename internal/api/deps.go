@@ -34,4 +34,5 @@ type RouterDeps struct {
 	DefaultRole        string
 	TrustProxy         bool
 	CORSOrigins        []string
+	SerDeChains        map[string]kafka.SerDeChain
 }

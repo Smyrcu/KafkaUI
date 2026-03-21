@@ -38,12 +38,13 @@ type controlMessage struct {
 }
 
 type LiveTailHandler struct {
-	registry *kafka.Registry
-	logger   *slog.Logger
+	registry    *kafka.Registry
+	logger      *slog.Logger
+	serdeChains map[string]kafka.SerDeChain
 }
 
-func NewLiveTailHandler(registry *kafka.Registry, logger *slog.Logger) *LiveTailHandler {
-	return &LiveTailHandler{registry: registry, logger: logger}
+func NewLiveTailHandler(registry *kafka.Registry, logger *slog.Logger, serdeChains map[string]kafka.SerDeChain) *LiveTailHandler {
+	return &LiveTailHandler{registry: registry, logger: logger, serdeChains: serdeChains}
 }
 
 func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -134,12 +135,18 @@ func (h *LiveTailHandler) Handle(w http.ResponseWriter, r *http.Request) {
 				for _, hdr := range r.Headers {
 					headers[hdr.Key] = string(hdr.Value)
 				}
+				key := string(r.Key)
+				value := string(r.Value)
+				if chain, ok := h.serdeChains[clusterName]; ok && chain != nil {
+					key = chain.Deserialize(topicName, r.Key, headers)
+					value = chain.Deserialize(topicName, r.Value, headers)
+				}
 				msg := kafka.MessageRecord{
 					Partition: r.Partition,
 					Offset:    r.Offset,
 					Timestamp: r.Timestamp,
-					Key:       string(r.Key),
-					Value:     string(r.Value),
+					Key:       key,
+					Value:     value,
 					Headers:   headers,
 				}
 
