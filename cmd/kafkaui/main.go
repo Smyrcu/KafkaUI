@@ -236,6 +236,13 @@ func main() {
 
 	providers, providerList := initProviders(cfg, logger)
 	basicAuth, rateLimiter := initBasicAuth(cfg, logger)
+
+	// Initialize LDAP authenticator if configured
+	var ldapAuth *auth.LDAPAuthenticator
+	if cfg.Auth.Enabled && slices.Contains(cfg.Auth.Types, "ldap") {
+		ldapAuth = auth.NewLDAPAuthenticator(cfg.Auth.LDAP, logger)
+		logger.Info("LDAP authentication enabled", "url", cfg.Auth.LDAP.URL)
+	}
 	metricsCtx, metricsCancel := context.WithCancel(context.Background())
 	defer metricsCancel()
 	var mockMetricsHandler http.Handler
@@ -274,6 +281,7 @@ func main() {
 		Providers:          providers,
 		ProviderList:       providerList,
 		BasicAuth:          basicAuth,
+		LDAPAuth:           ldapAuth,
 		RateLimiter:        rateLimiter,
 		AuthTypes:          cfg.Auth.Types,
 		MetricsStore:       metricsStore,

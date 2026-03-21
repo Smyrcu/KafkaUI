@@ -19,7 +19,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const hasBasic = status?.types?.includes("basic") ?? false;
+  const hasUsernamePassword = (status?.types?.includes("basic") || status?.types?.includes("ldap")) ?? false;
   const providers = status?.providers ?? [];
   const hasOidc = providers.length > 0;
 
@@ -66,7 +66,7 @@ export function LoginPage() {
             </Button>
           ))}
 
-          {hasBasic && hasOidc && (
+          {hasUsernamePassword && hasOidc && (
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
@@ -77,7 +77,7 @@ export function LoginPage() {
             </div>
           )}
 
-          {hasBasic && (
+          {hasUsernamePassword && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>

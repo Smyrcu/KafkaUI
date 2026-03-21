@@ -34,4 +34,5 @@ type RouterDeps struct {
 	DefaultRole        string
 	TrustProxy         bool
 	CORSOrigins        []string
+	LDAPAuth           *auth.LDAPAuthenticator
 }

@@ -54,6 +54,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		Providers:    deps.Providers,
 		ProviderList: deps.ProviderList,
 		Basic:        deps.BasicAuth,
+		LDAP:         deps.LDAPAuth,
 		RateLimiter:  deps.RateLimiter,
 		Sessions:     deps.Sessions,
 		UserStore:    deps.UserStore,
