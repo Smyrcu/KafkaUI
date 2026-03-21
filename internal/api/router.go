@@ -46,6 +46,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	metricsHandler := handlers.NewMetricsHandler(deps.MetricsStore)
 	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger)
 
+	celHandler := handlers.NewCELHandler()
 	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
 	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore)
 	healthHandler := handlers.NewHealthHandler(deps.Registry)
@@ -105,6 +106,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 			r.With(requireAction("view_dashboard")).Get("/dashboard", dashboardHandler.Overview)
 			r.With(requireAction("view_dashboard")).Get("/clusters", clusterHandler.List)
+			r.With(requireAction("view_messages")).Post("/cel/validate", celHandler.Validate)
 
 			r.Route("/admin", func(r chi.Router) {
 				r.Use(middleware.RequireRole("admin", deps.AuthEnabled, rbacDeps))
