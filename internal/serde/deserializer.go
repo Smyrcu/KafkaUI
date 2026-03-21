@@ -19,15 +19,21 @@ func NewChain(ds ...Deserializer) *Chain {
 // Deserialize attempts each deserializer in order. On the first successful
 // Detect+Deserialize, it returns the result. Falls back to raw string.
 func (c *Chain) Deserialize(topic string, data []byte, headers map[string]string) string {
+	result, _ := c.DeserializeWithFormat(topic, data, headers)
+	return result
+}
+
+// DeserializeWithFormat returns both the deserialized string and the format name.
+func (c *Chain) DeserializeWithFormat(topic string, data []byte, headers map[string]string) (string, string) {
 	if len(data) == 0 {
-		return ""
+		return "", ""
 	}
 	for _, d := range c.deserializers {
 		if d.Detect(topic, data, headers) {
 			if result, err := d.Deserialize(topic, data); err == nil {
-				return result
+				return result, d.Name()
 			}
 		}
 	}
-	return string(data)
+	return string(data), "string"
 }

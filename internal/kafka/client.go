@@ -26,6 +26,7 @@ type Client struct {
 // Extracted as interface to avoid circular imports with internal/serde.
 type SerDeChain interface {
 	Deserialize(topic string, data []byte, headers map[string]string) string
+	DeserializeWithFormat(topic string, data []byte, headers map[string]string) (string, string)
 }
 
 // SetSerDe sets the optional SerDe chain for message deserialization.
@@ -70,12 +71,14 @@ type CreateTopicRequest struct {
 }
 
 type MessageRecord struct {
-	Partition int32             `json:"partition"`
-	Offset    int64             `json:"offset"`
-	Timestamp time.Time         `json:"timestamp"`
-	Key       string            `json:"key"`
-	Value     string            `json:"value"`
-	Headers   map[string]string `json:"headers,omitempty"`
+	Partition   int32             `json:"partition"`
+	Offset      int64             `json:"offset"`
+	Timestamp   time.Time         `json:"timestamp"`
+	Key         string            `json:"key"`
+	Value       string            `json:"value"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	KeyFormat   string            `json:"keyFormat,omitempty"`
+	ValueFormat string            `json:"valueFormat,omitempty"`
 }
 
 type ConsumeRequest struct {
@@ -428,17 +431,20 @@ func (c *Client) ConsumeMessages(ctx context.Context, topic string, req ConsumeR
 			hdrs := recordHeaders(r)
 			key := string(r.Key)
 			value := string(r.Value)
+			var keyFmt, valFmt string
 			if c.serde != nil {
-				key = c.serde.Deserialize(r.Topic, r.Key, hdrs)
-				value = c.serde.Deserialize(r.Topic, r.Value, hdrs)
+				key, keyFmt = c.serde.DeserializeWithFormat(r.Topic, r.Key, hdrs)
+				value, valFmt = c.serde.DeserializeWithFormat(r.Topic, r.Value, hdrs)
 			}
 			records = append(records, MessageRecord{
-				Partition: r.Partition,
-				Offset:    r.Offset,
-				Timestamp: r.Timestamp,
-				Key:       key,
-				Value:     value,
-				Headers:   hdrs,
+				Partition:   r.Partition,
+				Offset:      r.Offset,
+				Timestamp:   r.Timestamp,
+				Key:         key,
+				Value:       value,
+				Headers:     hdrs,
+				KeyFormat:   keyFmt,
+				ValueFormat: valFmt,
 			})
 		})
 		// No new messages — topic exhausted, stop waiting.

@@ -342,7 +342,10 @@ export function TopicMessagesPage() {
                       <TableCell className="font-mono text-xs">{m.offset}</TableCell>
                       <TableCell className="text-xs">{new Date(m.timestamp).toLocaleString()}</TableCell>
                       <TableCell className="font-mono text-xs max-w-[150px] truncate">{m.key || <span className="text-muted-foreground">null</span>}</TableCell>
-                      <TableCell className="font-mono text-xs max-w-[300px] truncate">{m.value}</TableCell>
+                      <TableCell className="font-mono text-xs max-w-[300px] truncate">
+                        {m.valueFormat && <Badge variant="secondary" className="mr-2 text-[10px] px-1 py-0">{m.valueFormat.toUpperCase()}</Badge>}
+                        {m.value}
+                      </TableCell>
                     </TableRow>
                     {isExpanded && (
                       <TableRow>
@@ -353,7 +356,10 @@ export function TopicMessagesPage() {
                               <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-32">{m.key ? tryFormatJson(m.key) : "null"}</pre>
                             </div>
                             <div>
-                              <p className="text-xs font-semibold mb-1">Value</p>
+                              <p className="text-xs font-semibold mb-1">
+                                Value
+                                {m.valueFormat && <Badge variant="outline" className="ml-2 text-[10px]">{m.valueFormat}</Badge>}
+                              </p>
                               <pre className="text-xs bg-background rounded p-2 border overflow-auto max-h-64">{tryFormatJson(m.value)}</pre>
                             </div>
                             {m.headers && Object.keys(m.headers).length > 0 && (

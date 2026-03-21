@@ -30,6 +30,8 @@ export interface MessageRecord {
   key: string;
   value: string;
   headers?: Record<string, string>;
+  keyFormat?: string;
+  valueFormat?: string;
 }
 
 export interface ProduceRequest {
