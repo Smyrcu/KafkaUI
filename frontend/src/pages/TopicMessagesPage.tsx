@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useHasAction } from "@/hooks/usePermissions";
@@ -40,30 +40,27 @@ export function TopicMessagesPage() {
   const [celValid, setCelValid] = useState<{ valid: boolean; error?: string } | null>(null);
   const [celValidating, setCelValidating] = useState(false);
 
-  // Debounced CEL filter validation
-  const validateCel = useCallback((expr: string) => {
-    if (!expr.trim()) {
+  // Debounced CEL filter validation with stale-response protection
+  useEffect(() => {
+    if (!celFilter.trim()) {
       setCelValid(null);
+      setCelValidating(false);
       return;
     }
     setCelValidating(true);
+    let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const result = await api.cel.validate(expr);
-        setCelValid(result);
+        const result = await api.cel.validate(celFilter);
+        if (!cancelled) setCelValid(result);
       } catch {
-        setCelValid(null);
+        if (!cancelled) setCelValid(null);
       } finally {
-        setCelValidating(false);
+        if (!cancelled) setCelValidating(false);
       }
     }, 400);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const cleanup = validateCel(celFilter);
-    return cleanup;
-  }, [celFilter, validateCel]);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [celFilter]);
 
   // Live tail
   const wsUrl = clusterName && topicName

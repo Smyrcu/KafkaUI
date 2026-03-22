@@ -1,6 +1,8 @@
 package serde
 
 import (
+	"log/slog"
+
 	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/schema"
 )
@@ -9,6 +11,9 @@ import (
 // When default is "auto" (or empty), the chain tries Avro → Protobuf → JSON → String.
 // When a specific format is set, only that deserializer (+ String fallback) is used.
 func BuildChain(cfg config.SerDeConfig, schemaClient *schema.Client) *Chain {
+	if len(cfg.Rules) > 0 {
+		slog.Warn("serde.rules is configured but not yet implemented — rules will be ignored, using serde.default mode")
+	}
 	switch cfg.Default {
 	case "json":
 		return NewChain(&JSONDeserializer{}, &StringDeserializer{})

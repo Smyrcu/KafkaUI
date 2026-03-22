@@ -9,12 +9,15 @@ import (
 
 	"github.com/Smyrcu/KafkaUI/internal/config"
 	"github.com/Smyrcu/KafkaUI/internal/kafka"
+	"github.com/Smyrcu/KafkaUI/internal/schema"
+	"github.com/Smyrcu/KafkaUI/internal/serde"
 )
 
 type AdminHandler struct {
 	registry    *kafka.Registry
 	dynamicCfg  *config.DynamicConfig
 	staticNames []string
+	serdeChains map[string]kafka.SerDeChain
 }
 
 type AdminClusterInfo struct {
@@ -45,11 +48,12 @@ type AddClusterRequest struct {
 	Metrics          config.MetricsConfig        `json:"metrics"`
 }
 
-func NewAdminHandler(registry *kafka.Registry, dynamicCfg *config.DynamicConfig, staticNames []string) *AdminHandler {
+func NewAdminHandler(registry *kafka.Registry, dynamicCfg *config.DynamicConfig, staticNames []string, serdeChains map[string]kafka.SerDeChain) *AdminHandler {
 	return &AdminHandler{
 		registry:    registry,
 		dynamicCfg:  dynamicCfg,
 		staticNames: staticNames,
+		serdeChains: serdeChains,
 	}
 }
 
@@ -145,6 +149,9 @@ func (h *AdminHandler) AddCluster(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build SerDe chain for the new cluster
+	h.buildSerDeChain(cc)
+
 	writeJSON(w, http.StatusCreated, map[string]string{"status": "created"})
 }
 
@@ -186,6 +193,9 @@ func (h *AdminHandler) UpdateCluster(w http.ResponseWriter, r *http.Request) {
 		writeInternalError(w, "updating cluster", err)
 		return
 	}
+
+	// Rebuild SerDe chain for the updated cluster
+	h.buildSerDeChain(cc)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
@@ -260,4 +270,20 @@ func testConnection(cc config.ClusterConfig) error {
 
 	_, err = client.Brokers(ctx)
 	return err
+}
+
+// buildSerDeChain creates a SerDe chain for a cluster config and sets it on the kafka client.
+func (h *AdminHandler) buildSerDeChain(cc config.ClusterConfig) {
+	if h.serdeChains == nil {
+		return
+	}
+	var schemaClient *schema.Client
+	if cc.SchemaRegistry.URL != "" {
+		schemaClient = schema.NewClient(cc.SchemaRegistry.URL)
+	}
+	chain := serde.BuildChain(cc.SerDe, schemaClient)
+	h.serdeChains[cc.Name] = chain
+	if client, ok := h.registry.Get(cc.Name); ok {
+		client.SetSerDe(chain)
+	}
 }

@@ -47,7 +47,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	liveTailHandler := ws.NewLiveTailHandler(deps.Registry, deps.Logger, deps.SerDeChains)
 
 	celHandler := handlers.NewCELHandler()
-	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames)
+	adminHandler := handlers.NewAdminHandler(deps.Registry, deps.DynamicCfg, deps.StaticClusterNames, deps.SerDeChains)
 	adminUsersHandler := handlers.NewAdminUsersHandler(deps.UserStore, deps.AutoAssignment, deps.DefaultRole)
 	healthHandler := handlers.NewHealthHandler(deps.Registry)
 

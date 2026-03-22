@@ -8,12 +8,15 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/Smyrcu/KafkaUI/internal/httpclient"
 )
 
 type Client struct {
 	http        *httpclient.Client
 	schemaCache sync.Map // schema ID (int) -> schema JSON (string); immutable, never expires
+	fetchGroup  singleflight.Group
 }
 
 type SubjectInfo struct {
@@ -203,13 +206,19 @@ func (c *Client) GetSchemaByID(ctx context.Context, id int) (string, error) {
 		return cached.(string), nil
 	}
 
-	var resp struct {
-		Schema string `json:"schema"`
+	key := fmt.Sprintf("schema-%d", id)
+	result, err, _ := c.fetchGroup.Do(key, func() (any, error) {
+		var resp struct {
+			Schema string `json:"schema"`
+		}
+		if err := c.http.Do(ctx, "GET", fmt.Sprintf("/schemas/ids/%d", id), nil, &resp); err != nil {
+			return "", fmt.Errorf("get schema by id %d: %w", id, err)
+		}
+		c.schemaCache.Store(id, resp.Schema)
+		return resp.Schema, nil
+	})
+	if err != nil {
+		return "", err
 	}
-	if err := c.http.Do(ctx, "GET", fmt.Sprintf("/schemas/ids/%d", id), nil, &resp); err != nil {
-		return "", fmt.Errorf("get schema by id %d: %w", id, err)
-	}
-
-	c.schemaCache.Store(id, resp.Schema)
-	return resp.Schema, nil
+	return result.(string), nil
 }

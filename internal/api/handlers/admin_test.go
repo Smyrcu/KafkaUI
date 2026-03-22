@@ -27,7 +27,7 @@ func newAdminTestHandler(t *testing.T, clusters []config.ClusterConfig, staticNa
 	dynamicPath := filepath.Join(tmpDir, "dynamic.yaml")
 	dynamicCfg := config.NewDynamicConfig(dynamicPath)
 
-	return NewAdminHandler(reg, dynamicCfg, staticNames)
+	return NewAdminHandler(reg, dynamicCfg, staticNames, nil)
 }
 
 func TestAdminHandler_ListClusters(t *testing.T) {
@@ -152,7 +152,7 @@ func TestAdminHandler_DeleteCluster_LastOne(t *testing.T) {
 	}
 	t.Cleanup(reg.Close)
 
-	h := NewAdminHandler(reg, dynamicCfg, nil) // no static names
+	h := NewAdminHandler(reg, dynamicCfg, nil, nil) // no static names
 
 	r := chi.NewRouter()
 	r.Delete("/api/v1/admin/clusters/{name}", h.DeleteCluster)

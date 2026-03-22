@@ -19,7 +19,7 @@ type IdentityProvider interface {
 // UserIdentity is the normalized identity returned by any provider.
 type UserIdentity struct {
 	ProviderName string
-	ProviderType string // "oidc" | "oauth2"
+	ProviderType string // "basic" | "ldap" | "oidc" | "oauth2"
 	ExternalID   string
 	Email        string
 	Name         string

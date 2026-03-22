@@ -173,7 +173,7 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
               </Button>
             )}
             {!isLastStep && (
-              <Button onClick={() => dispatch({ type: "SET_STEP", step: step + 1 })} disabled={!canNext}>
+              <Button onClick={handleNext} disabled={!canNext}>
                 Next
               </Button>
             )}
