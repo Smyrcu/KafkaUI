@@ -2,8 +2,8 @@ apiVersion: v2
 name: kafkaui
 description: A Helm chart for KafkaUI - web UI for Apache Kafka
 type: application
-version: 0.13.1
-appVersion: "0.13.1"
+version: 0.14.0
+appVersion: "0.14.0"
 home: https://github.com/Smyrcu/KafkaUI
 sources:
   - https://github.com/Smyrcu/KafkaUI
