@@ -168,7 +168,7 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
           </div>
           <div className="flex gap-2">
             {isOptionalStep && !isLastStep && (
-              <Button variant="ghost" onClick={() => dispatch({ type: "SET_STEP", step: step + 1 })}>
+              <Button variant="ghost" onClick={handleNext}>
                 Skip
               </Button>
             )}
@@ -178,7 +178,13 @@ export function ClusterWizard({ open, onClose, onSaved, initialData }: ClusterWi
               </Button>
             )}
             {isLastStep && (
-              <Button onClick={handleSave} disabled={saving}>
+              <Button
+                onClick={() => {
+                  if (!testResult && !window.confirm("Connection was not tested. Save anyway?")) return;
+                  handleSave();
+                }}
+                disabled={saving}
+              >
                 {saving ? "Saving..." : "Save"}
               </Button>
             )}

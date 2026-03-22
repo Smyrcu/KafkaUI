@@ -8,6 +8,17 @@ interface KafkaConnectStepProps {
   onChange: (kc?: { name: string; url: string }[]) => void;
 }
 
+function validateURL(value: string): string | null {
+  if (!value) return null;
+  try {
+    const u = new URL(value);
+    if (!["http:", "https:"].includes(u.protocol)) return "Must be http:// or https://";
+    return null;
+  } catch {
+    return "Invalid URL";
+  }
+}
+
 export function KafkaConnectStep({ kafkaConnect, onChange }: KafkaConnectStepProps) {
   const entries = kafkaConnect ?? [];
 
@@ -28,21 +39,32 @@ export function KafkaConnectStep({ kafkaConnect, onChange }: KafkaConnectStepPro
       {entries.length === 0 && (
         <p className="text-sm text-muted-foreground">No Connect clusters configured. Click below to add one, or skip this step.</p>
       )}
-      {entries.map((entry, i) => (
-        <div key={i} className="flex gap-2 items-end">
-          <div className="flex-1 space-y-1">
-            <Label className="text-xs">Name</Label>
-            <Input value={entry.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="connect-1" />
+      {entries.map((entry, i) => {
+        const urlError = validateURL(entry.url);
+        return (
+          <div key={i} className="space-y-1">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Name</Label>
+                <Input value={entry.name} onChange={(e) => update(i, "name", e.target.value)} placeholder="connect-1" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">URL</Label>
+                <Input
+                  value={entry.url}
+                  onChange={(e) => update(i, "url", e.target.value)}
+                  placeholder="http://connect:8083"
+                  className={urlError ? "border-destructive" : ""}
+                />
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => remove(i)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+            {urlError && <p className="text-xs text-destructive ml-[calc(50%+0.25rem)]">{urlError}</p>}
           </div>
-          <div className="flex-1 space-y-1">
-            <Label className="text-xs">URL</Label>
-            <Input value={entry.url} onChange={(e) => update(i, "url", e.target.value)} placeholder="http://connect:8083" />
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => remove(i)}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        </div>
-      ))}
+        );
+      })}
       <Button variant="outline" size="sm" onClick={add}>
         <Plus className="h-4 w-4 mr-1" /> Add Connect Cluster
       </Button>
